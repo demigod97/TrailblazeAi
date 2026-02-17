@@ -1,5 +1,5 @@
 ---
-stepsCompleted: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+stepsCompleted: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]
 inputDocuments:
   - _bmad-output/planning-artifacts/product-brief-TrailblazeAi-2026-02-17.md
   - _bmad-output/planning-artifacts/prd.md
@@ -1322,3 +1322,159 @@ apps/web/src/components/
 - Skeleton pulse animation disabled — static muted background
 - Toast enter/exit: instant appear/disappear
 - Stat card values: instant swap, no cross-fade
+
+## Responsive Design & Accessibility
+
+### Responsive Strategy
+
+**Desktop-first approach.** TrailBlazeAI is a power-user automation tool. The primary use case (watching pipeline + reviewing quizzes) benefits from screen real estate. Mobile is a monitoring convenience, not the core experience.
+
+**Desktop (≥1024px) — Full experience:**
+- Three-column layout: sidebar (220px) + pipeline (flexible) + review panel (340px)
+- All features available: full pipeline view, quiz review, knowledge base, settings
+- Stat cards in 4-column grid
+- Filter chips fully visible
+- Cmd+K omnibar available
+
+**Tablet (768–1023px) — Adapted experience:**
+- Two-column layout: collapsed sidebar (48px icons) + pipeline (flexible)
+- Review panel becomes a slide-over drawer (triggered by tapping quiz-ready module)
+- Stat cards in 2-column grid (2x2)
+- Filter chips scroll horizontally if needed
+- Touch targets enlarged to 44px minimum
+- Cmd+K available via toolbar search icon
+
+**Mobile (<768px) — Monitoring experience:**
+- Single column layout
+- Sidebar replaced by bottom tab bar (4 tabs: Dashboard, Knowledge, Review, Settings)
+- Review panel becomes full-screen modal (swipe down to dismiss)
+- Stat cards stack vertically or display as 2-column compact grid
+- URL input accessible from floating action button or top of dashboard
+- Filter chips in horizontally scrollable row
+- Simplified module rows (badge + title only, tap to expand)
+
+### Breakpoint Strategy
+
+**Breakpoints (Tailwind v4 defaults):**
+
+| Token | Width | Layout Change |
+|-------|-------|--------------|
+| `sm` | 640px | Minor adjustments: stack stat cards, compact spacing |
+| `md` | 768px | Tablet layout: sidebar collapses, 2-column stats |
+| `lg` | 1024px | Desktop layout: three-column grid, review panel inline |
+| `xl` | 1280px | Wide desktop: content max-width 1200px, centered |
+
+**Container strategy:**
+- Content max-width: 1200px on xl+ screens, centered with auto margins
+- Below xl: full-width with 24px horizontal padding (desktop), 16px (tablet), 12px (mobile)
+- No fixed breakpoint at 1536px (2xl) — not needed for this product
+
+**Approach:** Desktop-first media queries using Tailwind's responsive prefixes. Base styles are desktop, with `max-md:` and `max-lg:` overrides for smaller screens. This matches the development priority: build the full desktop experience first, then adapt down.
+
+### Accessibility Strategy
+
+**Compliance target: WCAG 2.1 Level AA**
+
+This is the industry standard for professional web applications. It covers all essential accessibility needs without the overhead of AAA compliance (which requires enhanced contrast ratios and reading level constraints that are unnecessary for a developer tool).
+
+**Color & Contrast:**
+
+| Requirement | Standard | Our Implementation |
+|-------------|----------|-------------------|
+| Normal text contrast | 4.5:1 minimum | Primary indigo on white: 5.2:1 (pass) |
+| Large text contrast | 3:1 minimum | All heading colors verified ≥ 3.5:1 |
+| Non-text contrast | 3:1 minimum | Pipeline status badge backgrounds meet threshold |
+| Color not sole indicator | Must pair with text/icon | All status badges include text label, never color-only |
+
+**Keyboard Navigation:**
+
+| Context | Keys | Behavior |
+|---------|------|----------|
+| Global | `Cmd+K` | Open omnibar |
+| Global | `Escape` | Close any modal/panel/omnibar |
+| Pipeline list | `Tab` / `Shift+Tab` | Navigate between module rows |
+| Pipeline list | `Enter` | Expand module / open in review panel |
+| Review panel | `Enter` | Approve current answer |
+| Review panel | `E` | Edit current answer |
+| Review panel | `Tab` | Move between Approve/Edit buttons |
+| Filter chips | `Arrow Left/Right` | Navigate between chips |
+| Filter chips | `Enter` / `Space` | Activate chip |
+| Sidebar | `Tab` | Navigate between nav items |
+| Sidebar | `Enter` | Navigate to page |
+
+**Focus management:**
+- Focus ring: 2px solid `--ring` token, 2px offset, visible in both themes
+- Skip link: "Skip to main content" as first focusable element (hidden until focused)
+- Modal focus trap: Cmd+K omnibar and review modal (mobile) trap focus, return on close
+- Review panel: focus moves to first question when panel opens, returns to triggering module row when panel closes
+
+**Screen reader support:**
+
+| Element | ARIA Implementation |
+|---------|-------------------|
+| AppShell | `<nav>`, `<main>`, `<aside>` landmark roles |
+| Sidebar | `role="navigation"`, `aria-current="page"` on active |
+| Stat cards | `aria-label` with full context (e.g., "47 of 89 modules completed") |
+| Pipeline list | `role="list"`, `role="listitem"` on rows |
+| Status badges | `aria-label` with status text |
+| Pipeline updates | `aria-live="polite"` region for status changes |
+| Review panel | `role="complementary"`, `aria-label="Quiz review"` |
+| Quiz question | `aria-describedby` linking question to answer |
+| Confidence bar | `role="meter"` with `aria-valuenow`, `aria-valuemin`, `aria-valuemax` |
+| Filter chips | `role="radiogroup"` with `role="radio"` on each |
+| Toasts | `role="status"` (polite announcement) |
+
+**Motion & animation:**
+- All animations respect `prefers-reduced-motion: reduce` — instant transitions
+- No auto-playing animations — all motion triggered by user action or data change
+- Skeleton loading pulse disabled under reduced motion — static muted background
+
+### Testing Strategy
+
+**Automated testing (CI pipeline):**
+- `eslint-plugin-jsx-a11y` — catches common accessibility issues at build time
+- `axe-core` via Playwright — automated accessibility audit on all pages
+- Lighthouse CI — accessibility score ≥ 90 enforced on PR checks
+- Color contrast checker in design token validation
+
+**Manual testing checklist (per feature):**
+- [ ] Keyboard-only navigation: can complete all tasks without mouse
+- [ ] Screen reader walkthrough: VoiceOver (macOS) announces all content correctly
+- [ ] Focus order matches visual layout (left-to-right, top-to-bottom)
+- [ ] All interactive elements have visible focus indicators
+- [ ] Color is never the sole indicator of state
+- [ ] Touch targets ≥ 44px on mobile breakpoints
+- [ ] Reduced motion preference respected
+
+**Browser/device testing matrix:**
+
+| Browser | Desktop | Tablet | Mobile |
+|---------|---------|--------|--------|
+| Chrome | Primary | Secondary | Secondary |
+| Firefox | Primary | — | — |
+| Safari | Primary | Primary (iPad) | Primary (iPhone) |
+| Edge | Secondary | — | — |
+
+### Implementation Guidelines
+
+**Responsive development:**
+- Use Tailwind responsive prefixes (`md:`, `lg:`, `xl:`) for layout changes
+- Use `rem` for typography and spacing — scales with user font size preferences
+- Use CSS Grid for page layout, Flexbox for component internals
+- Test with browser zoom 100%, 150%, 200% — layout must not break
+- Images and icons use SVG where possible — scales cleanly at any resolution
+
+**Accessibility development:**
+- Semantic HTML first: `<nav>`, `<main>`, `<aside>`, `<button>`, `<a>`, `<h1>`–`<h3>`
+- Only use `div`/`span` for styling containers — never for interactive elements
+- Radix UI primitives (via shadcn) provide ARIA attributes automatically — don't override
+- Custom components must include `aria-label` or `aria-labelledby` where visible text is insufficient
+- All `aria-live` regions use `"polite"` — never `"assertive"` for this product
+- Focus management: use `useRef` + `focus()` for programmatic focus changes (panel open/close)
+- Test with `tabindex` carefully — only `0` (natural order) or `-1` (programmatic only), never positive values
+
+**CSS custom properties for theming:**
+- All colors reference semantic tokens (`--primary`, `--muted-foreground`, etc.)
+- Dark/light theme toggle via `data-theme` attribute on `<html>`
+- Theme preference stored in `localStorage`, respects `prefers-color-scheme` as default
+- No color hex values in component CSS — always token references
