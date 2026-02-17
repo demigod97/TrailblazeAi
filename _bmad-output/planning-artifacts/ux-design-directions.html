@@ -1,0 +1,1417 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TrailBlazeAI — Design Directions</title>
+<style>
+  /* ========== Reset & Base ========== */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { font-size: 16px; scroll-behavior: smooth; }
+  body {
+    font-family: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #0a0a0f;
+    color: #fafafa;
+    line-height: 1.5;
+  }
+
+  /* ========== Navigation ========== */
+  .nav {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+    background: rgba(10,10,15,0.92);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    padding: 12px 24px;
+    display: flex; align-items: center; gap: 16px;
+    overflow-x: auto;
+  }
+  .nav-title {
+    font-weight: 600; font-size: 14px; color: #a5b4fc;
+    white-space: nowrap; margin-right: 8px;
+  }
+  .nav-btn {
+    padding: 6px 14px; border-radius: 6px;
+    border: 1px solid rgba(255,255,255,0.1);
+    background: transparent; color: #94a3b8;
+    font-size: 13px; font-family: inherit;
+    cursor: pointer; white-space: nowrap;
+    transition: all 0.15s ease;
+  }
+  .nav-btn:hover, .nav-btn.active {
+    background: rgba(129,140,248,0.15);
+    border-color: rgba(129,140,248,0.3);
+    color: #c7d2fe;
+  }
+  .nav-btn.active { color: #a5b4fc; font-weight: 500; }
+
+  /* ========== Section Container ========== */
+  .direction {
+    min-height: 100vh;
+    padding: 80px 24px 48px;
+    display: none;
+    animation: fadeIn 0.3s ease;
+  }
+  .direction.active { display: block; }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+  .dir-header {
+    max-width: 1200px; margin: 0 auto 32px;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    padding-bottom: 24px;
+  }
+  .dir-header h2 { font-size: 24px; font-weight: 600; margin-bottom: 4px; }
+  .dir-header .subtitle { color: #94a3b8; font-size: 14px; }
+  .dir-header .tags { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+  .dir-header .tag {
+    padding: 2px 10px; border-radius: 4px;
+    font-size: 12px; font-family: 'IBM Plex Mono', monospace;
+  }
+  .tag-layout { background: rgba(129,140,248,0.12); color: #a5b4fc; }
+  .tag-style { background: rgba(168,85,247,0.12); color: #c084fc; }
+  .tag-pattern { background: rgba(34,211,238,0.12); color: #67e8f9; }
+
+  .mockup-frame {
+    max-width: 1200px; margin: 0 auto;
+    border-radius: 12px; overflow: hidden;
+    border: 1px solid rgba(255,255,255,0.08);
+    background: #111118;
+  }
+
+  /* ========== Shared mockup primitives ========== */
+  .mock-sidebar {
+    display: flex; flex-direction: column;
+    padding: 16px 0;
+  }
+  .mock-sidebar .logo {
+    padding: 0 16px 16px;
+    font-weight: 600; font-size: 15px;
+    display: flex; align-items: center; gap: 8px;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    margin-bottom: 8px;
+  }
+  .mock-sidebar .logo .dot {
+    width: 20px; height: 20px; border-radius: 6px;
+    background: linear-gradient(135deg, #818cf8, #6366f1);
+  }
+  .mock-sidebar .nav-item {
+    padding: 8px 16px; font-size: 13px; color: #94a3b8;
+    display: flex; align-items: center; gap: 10px;
+    cursor: default; border-radius: 0;
+    transition: background 0.1s;
+  }
+  .mock-sidebar .nav-item:hover { background: rgba(255,255,255,0.03); }
+  .mock-sidebar .nav-item.active-item {
+    color: #e2e8f0; background: rgba(129,140,248,0.08);
+    border-right: 2px solid #818cf8;
+  }
+  .mock-sidebar .nav-item .icon { width: 16px; text-align: center; opacity: 0.7; }
+
+  .mock-topbar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 24px;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+  }
+  .mock-topbar h3 { font-size: 16px; font-weight: 600; }
+
+  .mock-search {
+    display: flex; align-items: center; gap: 8px;
+    padding: 7px 14px; border-radius: 6px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    color: #64748b; font-size: 13px;
+  }
+  .mock-search .kbd {
+    padding: 1px 6px; border-radius: 4px;
+    background: rgba(255,255,255,0.06);
+    font-size: 11px; font-family: monospace;
+    color: #94a3b8;
+  }
+
+  .stat-card {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 8px; padding: 16px;
+  }
+  .stat-card .stat-label { font-size: 12px; color: #64748b; margin-bottom: 4px; }
+  .stat-card .stat-value { font-size: 28px; font-weight: 700; font-family: 'IBM Plex Mono', monospace; }
+  .stat-card .stat-sub { font-size: 12px; color: #64748b; margin-top: 2px; }
+
+  .module-card {
+    background: rgba(255,255,255,0.02);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 8px; padding: 14px;
+    transition: border-color 0.15s;
+  }
+  .module-card:hover { border-color: rgba(129,140,248,0.3); }
+  .module-card .mc-title { font-size: 14px; font-weight: 500; margin-bottom: 6px; }
+  .module-card .mc-meta { font-size: 12px; color: #64748b; display: flex; align-items: center; gap: 8px; }
+
+  .badge {
+    display: inline-flex; align-items: center;
+    padding: 2px 8px; border-radius: 4px;
+    font-size: 11px; font-weight: 500;
+    font-family: 'IBM Plex Mono', monospace;
+  }
+  .badge-queued { background: rgba(148,163,184,0.12); color: #94a3b8; }
+  .badge-scraping { background: rgba(34,211,238,0.12); color: #22d3ee; }
+  .badge-processing { background: rgba(168,85,247,0.12); color: #a855f7; }
+  .badge-quiz-ready { background: rgba(251,191,36,0.15); color: #fbbf24; }
+  .badge-completed { background: rgba(34,197,94,0.12); color: #22c55e; }
+  .badge-error { background: rgba(239,68,68,0.12); color: #ef4444; }
+
+  .progress-bar {
+    height: 4px; border-radius: 2px;
+    background: rgba(255,255,255,0.06);
+    overflow: hidden; margin-top: 8px;
+  }
+  .progress-bar .fill {
+    height: 100%; border-radius: 2px;
+    background: linear-gradient(90deg, #818cf8, #6366f1);
+    transition: width 0.3s ease;
+  }
+
+  .url-input {
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 16px; border-radius: 8px;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.1);
+    color: #64748b; font-size: 14px;
+    width: 100%;
+  }
+  .url-input:focus-within { border-color: #818cf8; box-shadow: 0 0 0 2px rgba(129,140,248,0.2); }
+
+  .btn-primary {
+    padding: 8px 16px; border-radius: 6px;
+    background: #6366f1; color: white;
+    border: none; font-size: 13px; font-weight: 500;
+    cursor: pointer; font-family: inherit;
+  }
+  .btn-secondary {
+    padding: 8px 16px; border-radius: 6px;
+    background: rgba(255,255,255,0.06); color: #e2e8f0;
+    border: 1px solid rgba(255,255,255,0.1);
+    font-size: 13px; cursor: pointer; font-family: inherit;
+  }
+
+  .filter-chip {
+    padding: 4px 12px; border-radius: 20px;
+    font-size: 12px; border: 1px solid rgba(255,255,255,0.1);
+    color: #94a3b8; cursor: pointer;
+    transition: all 0.1s;
+  }
+  .filter-chip:hover, .filter-chip.active-chip {
+    border-color: rgba(129,140,248,0.3);
+    background: rgba(129,140,248,0.1);
+    color: #c7d2fe;
+  }
+
+  /* ========== Direction-Specific Styles ========== */
+
+  /* Direction 1: Operations Command Center */
+  .d1-layout {
+    display: grid; grid-template-columns: 220px 1fr;
+    min-height: 600px;
+  }
+  .d1-sidebar { background: rgba(0,0,0,0.3); border-right: 1px solid rgba(255,255,255,0.06); }
+  .d1-main { display: flex; flex-direction: column; }
+  .d1-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; padding: 20px 24px; }
+  .d1-content { padding: 0 24px 24px; flex: 1; }
+  .d1-pipeline-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 16px;
+  }
+  .d1-pipeline-cols {
+    display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px;
+  }
+  .d1-col-header {
+    font-size: 12px; font-weight: 500; color: #64748b;
+    text-transform: uppercase; letter-spacing: 0.5px;
+    padding-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.06);
+    margin-bottom: 8px;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .d1-col-count {
+    font-size: 11px; padding: 1px 6px; border-radius: 10px;
+    background: rgba(255,255,255,0.06);
+  }
+  .d1-col-cards { display: flex; flex-direction: column; gap: 8px; }
+
+  /* Direction 2: Minimal Focus */
+  .d2-layout {
+    display: grid; grid-template-columns: 48px 1fr;
+    min-height: 600px;
+  }
+  .d2-sidebar {
+    background: rgba(0,0,0,0.3);
+    border-right: 1px solid rgba(255,255,255,0.06);
+    display: flex; flex-direction: column; align-items: center;
+    padding: 16px 0; gap: 4px;
+  }
+  .d2-sidebar .icon-btn {
+    width: 32px; height: 32px; border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    color: #64748b; font-size: 14px; cursor: default;
+    transition: all 0.1s;
+  }
+  .d2-sidebar .icon-btn:hover { background: rgba(255,255,255,0.04); color: #94a3b8; }
+  .d2-sidebar .icon-btn.active-icon { background: rgba(129,140,248,0.1); color: #a5b4fc; }
+  .d2-main { display: flex; flex-direction: column; }
+  .d2-hero {
+    padding: 48px 40px; text-align: center;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+  }
+  .d2-hero h2 { font-size: 20px; font-weight: 600; margin-bottom: 16px; }
+  .d2-hero .url-input { max-width: 560px; margin: 0 auto; }
+  .d2-stats-row {
+    display: flex; justify-content: center; gap: 40px;
+    padding: 20px; border-bottom: 1px solid rgba(255,255,255,0.06);
+  }
+  .d2-stat { text-align: center; }
+  .d2-stat .val { font-size: 24px; font-weight: 700; font-family: 'IBM Plex Mono', monospace; }
+  .d2-stat .lbl { font-size: 11px; color: #64748b; margin-top: 2px; }
+  .d2-content { padding: 24px 40px; flex: 1; }
+
+  /* Direction 3: Dense Data Table */
+  .d3-layout {
+    display: grid; grid-template-columns: 220px 1fr;
+    min-height: 600px;
+  }
+  .d3-sidebar { background: rgba(0,0,0,0.3); border-right: 1px solid rgba(255,255,255,0.06); }
+  .d3-main { display: flex; flex-direction: column; }
+  .d3-toolbar {
+    display: flex; align-items: center; gap: 12px;
+    padding: 12px 24px;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+  }
+  .d3-content { padding: 0; flex: 1; overflow: auto; }
+  .d3-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .d3-table th {
+    text-align: left; padding: 8px 16px;
+    font-size: 11px; font-weight: 500; color: #64748b;
+    text-transform: uppercase; letter-spacing: 0.5px;
+    background: rgba(0,0,0,0.2);
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    position: sticky; top: 0;
+  }
+  .d3-table td {
+    padding: 10px 16px;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    color: #e2e8f0;
+  }
+  .d3-table tr:hover td { background: rgba(129,140,248,0.04); }
+
+  /* Direction 4: Split Panel */
+  .d4-layout {
+    display: grid; grid-template-columns: 220px 360px 1fr;
+    min-height: 600px;
+  }
+  .d4-sidebar { background: rgba(0,0,0,0.3); border-right: 1px solid rgba(255,255,255,0.06); }
+  .d4-list {
+    border-right: 1px solid rgba(255,255,255,0.06);
+    display: flex; flex-direction: column;
+  }
+  .d4-list-header {
+    padding: 12px 16px;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .d4-list-items { flex: 1; overflow-y: auto; }
+  .d4-list-item {
+    padding: 12px 16px;
+    border-bottom: 1px solid rgba(255,255,255,0.03);
+    cursor: default; transition: background 0.1s;
+  }
+  .d4-list-item:hover { background: rgba(255,255,255,0.02); }
+  .d4-list-item.selected { background: rgba(129,140,248,0.08); border-left: 2px solid #818cf8; }
+  .d4-list-item .li-title { font-size: 13px; font-weight: 500; margin-bottom: 3px; }
+  .d4-list-item .li-meta { font-size: 11px; color: #64748b; }
+  .d4-detail { padding: 24px; display: flex; flex-direction: column; }
+  .d4-detail-header { margin-bottom: 20px; }
+  .d4-detail-header h3 { font-size: 18px; font-weight: 600; margin-bottom: 8px; }
+
+  /* Direction 5: Timeline Flow */
+  .d5-layout {
+    display: grid; grid-template-columns: 220px 1fr;
+    min-height: 600px;
+  }
+  .d5-sidebar { background: rgba(0,0,0,0.3); border-right: 1px solid rgba(255,255,255,0.06); }
+  .d5-main { display: flex; flex-direction: column; }
+  .d5-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; padding: 20px 24px; border-bottom: 1px solid rgba(255,255,255,0.06); }
+  .d5-content { padding: 24px; flex: 1; }
+  .d5-timeline { position: relative; padding-left: 24px; }
+  .d5-timeline::before {
+    content: ''; position: absolute; left: 7px; top: 0; bottom: 0;
+    width: 2px; background: rgba(255,255,255,0.06);
+  }
+  .d5-event {
+    position: relative; margin-bottom: 16px;
+    padding: 12px 16px; border-radius: 8px;
+    background: rgba(255,255,255,0.02);
+    border: 1px solid rgba(255,255,255,0.06);
+  }
+  .d5-event::before {
+    content: ''; position: absolute; left: -21px; top: 16px;
+    width: 10px; height: 10px; border-radius: 50%;
+    border: 2px solid #818cf8;
+    background: #0a0a0f;
+  }
+  .d5-event.ev-active::before { background: #818cf8; }
+  .d5-event .ev-time { font-size: 11px; color: #64748b; font-family: monospace; margin-bottom: 4px; }
+  .d5-event .ev-title { font-size: 14px; font-weight: 500; }
+  .d5-event .ev-desc { font-size: 12px; color: #94a3b8; margin-top: 4px; }
+
+  /* Direction 6: Card Dashboard */
+  .d6-layout {
+    display: grid; grid-template-columns: 220px 1fr;
+    min-height: 600px;
+  }
+  .d6-sidebar { background: rgba(0,0,0,0.3); border-right: 1px solid rgba(255,255,255,0.06); }
+  .d6-main { display: flex; flex-direction: column; }
+  .d6-url-bar {
+    padding: 16px 24px;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+  }
+  .d6-grid {
+    padding: 24px;
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px;
+    flex: 1;
+  }
+  .d6-card {
+    background: rgba(255,255,255,0.02);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 8px; overflow: hidden;
+    transition: border-color 0.15s, transform 0.15s;
+  }
+  .d6-card:hover { border-color: rgba(129,140,248,0.3); transform: translateY(-1px); }
+  .d6-card-header {
+    padding: 14px 16px; display: flex; align-items: center; justify-content: space-between;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+  }
+  .d6-card-header .title { font-size: 14px; font-weight: 500; }
+  .d6-card-body { padding: 14px 16px; }
+  .d6-card-body .desc { font-size: 12px; color: #94a3b8; margin-bottom: 10px; }
+  .d6-card-footer {
+    padding: 10px 16px; display: flex; align-items: center; justify-content: space-between;
+    background: rgba(0,0,0,0.15); font-size: 12px; color: #64748b;
+  }
+
+  /* Direction 7: Quiz Review Focus */
+  .d7-layout {
+    display: grid; grid-template-columns: 220px 1fr 340px;
+    min-height: 600px;
+  }
+  .d7-sidebar { background: rgba(0,0,0,0.3); border-right: 1px solid rgba(255,255,255,0.06); }
+  .d7-main { display: flex; flex-direction: column; }
+  .d7-review-panel {
+    border-left: 1px solid rgba(255,255,255,0.06);
+    background: rgba(0,0,0,0.15);
+    display: flex; flex-direction: column;
+  }
+  .d7-review-header {
+    padding: 16px; border-bottom: 1px solid rgba(255,255,255,0.06);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .d7-question {
+    padding: 16px; border-bottom: 1px solid rgba(255,255,255,0.04);
+  }
+  .d7-question .q-label { font-size: 11px; color: #64748b; margin-bottom: 6px; font-weight: 500; }
+  .d7-question .q-text { font-size: 13px; margin-bottom: 10px; line-height: 1.5; }
+  .d7-answer {
+    padding: 10px 12px; border-radius: 6px;
+    background: rgba(129,140,248,0.08);
+    border: 1px solid rgba(129,140,248,0.2);
+    font-size: 13px; margin-bottom: 8px;
+  }
+  .d7-confidence {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 11px; color: #64748b;
+  }
+  .d7-conf-bar {
+    width: 48px; height: 4px; border-radius: 2px;
+    background: rgba(255,255,255,0.06);
+    overflow: hidden;
+  }
+  .d7-conf-bar .fill { height: 100%; border-radius: 2px; background: #22c55e; }
+  .d7-actions {
+    padding: 16px; margin-top: auto;
+    display: flex; gap: 8px;
+    border-top: 1px solid rgba(255,255,255,0.06);
+  }
+  .d7-actions .btn-primary { flex: 1; text-align: center; }
+  .d7-actions .btn-secondary { flex: 1; text-align: center; }
+
+  /* Direction 8: Light Theme */
+  .d8-frame {
+    background: #ffffff; color: #0f172a;
+  }
+  .d8-layout {
+    display: grid; grid-template-columns: 220px 1fr;
+    min-height: 600px;
+  }
+  .d8-sidebar {
+    background: #f8fafc; border-right: 1px solid #e2e8f0;
+    padding: 16px 0;
+  }
+  .d8-sidebar .logo {
+    padding: 0 16px 16px; font-weight: 600; font-size: 15px;
+    display: flex; align-items: center; gap: 8px;
+    border-bottom: 1px solid #e2e8f0; margin-bottom: 8px;
+    color: #0f172a;
+  }
+  .d8-sidebar .logo .dot {
+    width: 20px; height: 20px; border-radius: 6px;
+    background: linear-gradient(135deg, #818cf8, #6366f1);
+  }
+  .d8-sidebar .nav-item {
+    padding: 8px 16px; font-size: 13px; color: #64748b;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .d8-sidebar .nav-item.active-item {
+    color: #4f46e5; background: rgba(99,102,241,0.06);
+    border-right: 2px solid #6366f1;
+  }
+  .d8-main { display: flex; flex-direction: column; }
+  .d8-topbar {
+    padding: 12px 24px; border-bottom: 1px solid #e2e8f0;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .d8-topbar h3 { font-size: 16px; font-weight: 600; color: #0f172a; }
+  .d8-search {
+    padding: 7px 14px; border-radius: 6px;
+    background: #f1f5f9; border: 1px solid #e2e8f0;
+    color: #94a3b8; font-size: 13px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .d8-stats {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px;
+    padding: 20px 24px;
+  }
+  .d8-stat {
+    background: #ffffff; border: 1px solid #e2e8f0;
+    border-radius: 8px; padding: 16px;
+  }
+  .d8-stat .stat-label { font-size: 12px; color: #64748b; margin-bottom: 4px; }
+  .d8-stat .stat-value { font-size: 28px; font-weight: 700; color: #0f172a; font-family: 'IBM Plex Mono', monospace; }
+  .d8-stat .stat-sub { font-size: 12px; color: #64748b; margin-top: 2px; }
+  .d8-content { padding: 0 24px 24px; flex: 1; }
+  .d8-card {
+    background: #ffffff; border: 1px solid #e2e8f0;
+    border-radius: 8px; padding: 14px;
+    transition: border-color 0.15s;
+  }
+  .d8-card:hover { border-color: #a5b4fc; }
+  .d8-card .mc-title { font-size: 14px; font-weight: 500; color: #0f172a; margin-bottom: 6px; }
+  .d8-card .mc-meta { font-size: 12px; color: #64748b; display: flex; align-items: center; gap: 8px; }
+  .d8-badge-completed { background: rgba(34,197,94,0.1); color: #16a34a; }
+  .d8-badge-processing { background: rgba(168,85,247,0.1); color: #9333ea; }
+  .d8-badge-quiz-ready { background: rgba(245,158,11,0.1); color: #d97706; }
+  .d8-badge-queued { background: rgba(100,116,139,0.1); color: #64748b; }
+  .d8-progress-bar {
+    height: 4px; border-radius: 2px; background: #e2e8f0;
+    overflow: hidden; margin-top: 8px;
+  }
+  .d8-progress-bar .fill {
+    height: 100%; border-radius: 2px;
+    background: linear-gradient(90deg, #818cf8, #6366f1);
+  }
+  .d8-filter-chip {
+    padding: 4px 12px; border-radius: 20px;
+    font-size: 12px; border: 1px solid #e2e8f0;
+    color: #64748b; cursor: pointer;
+  }
+  .d8-filter-chip.active-chip {
+    border-color: #a5b4fc; background: rgba(99,102,241,0.06); color: #4f46e5;
+  }
+
+  /* ========== Comparison view ========== */
+  .compare-grid {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 24px; max-width: 1200px; margin: 0 auto;
+  }
+  .compare-card {
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 12px; overflow: hidden;
+    cursor: pointer; transition: border-color 0.15s;
+  }
+  .compare-card:hover { border-color: rgba(129,140,248,0.3); }
+  .compare-card .cc-preview {
+    height: 240px; overflow: hidden; position: relative;
+    background: #111118;
+  }
+  .compare-card .cc-preview > div { transform: scale(0.5); transform-origin: top left; width: 200%; height: 200%; pointer-events: none; }
+  .compare-card .cc-info { padding: 16px; background: rgba(0,0,0,0.3); }
+  .compare-card .cc-info h4 { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+  .compare-card .cc-info p { font-size: 12px; color: #94a3b8; }
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <span class="nav-title">TrailBlazeAI Directions</span>
+  <button class="nav-btn active" onclick="showDir('overview')">Overview</button>
+  <button class="nav-btn" onclick="showDir('d1')">1. Command Center</button>
+  <button class="nav-btn" onclick="showDir('d2')">2. Minimal Focus</button>
+  <button class="nav-btn" onclick="showDir('d3')">3. Data Table</button>
+  <button class="nav-btn" onclick="showDir('d4')">4. Split Panel</button>
+  <button class="nav-btn" onclick="showDir('d5')">5. Timeline Flow</button>
+  <button class="nav-btn" onclick="showDir('d6')">6. Card Grid</button>
+  <button class="nav-btn" onclick="showDir('d7')">7. Review Focus</button>
+  <button class="nav-btn" onclick="showDir('d8')">8. Light Theme</button>
+</nav>
+
+<!-- ==================== OVERVIEW ==================== -->
+<section class="direction active" id="overview">
+  <div class="dir-header">
+    <h2>Design Directions Overview</h2>
+    <p class="subtitle">8 visual directions for TrailBlazeAI. Click any direction to explore in detail.</p>
+  </div>
+  <div class="compare-grid">
+    <div class="compare-card" onclick="showDir('d1')">
+      <div class="cc-info">
+        <h4>1. Operations Command Center</h4>
+        <p>Kanban-style pipeline columns. Full sidebar. CI/CD dashboard feel. Best for: watching the pipeline work.</p>
+      </div>
+    </div>
+    <div class="compare-card" onclick="showDir('d2')">
+      <div class="cc-info">
+        <h4>2. Minimal Focus</h4>
+        <p>Collapsed icon sidebar. Hero URL input. Centered layout. Best for: clean, focused launch experience.</p>
+      </div>
+    </div>
+    <div class="compare-card" onclick="showDir('d3')">
+      <div class="cc-info">
+        <h4>3. Dense Data Table</h4>
+        <p>Table-first layout. Sortable columns. Filter toolbar. Best for: managing large volumes of modules.</p>
+      </div>
+    </div>
+    <div class="compare-card" onclick="showDir('d4')">
+      <div class="cc-info">
+        <h4>4. Split Panel (Linear-style)</h4>
+        <p>Three-panel: sidebar + list + detail. Click to inspect. Best for: deep-diving into individual modules.</p>
+      </div>
+    </div>
+    <div class="compare-card" onclick="showDir('d5')">
+      <div class="cc-info">
+        <h4>5. Timeline Flow</h4>
+        <p>Activity timeline as primary view. Chronological events. Best for: passive monitoring of progress.</p>
+      </div>
+    </div>
+    <div class="compare-card" onclick="showDir('d6')">
+      <div class="cc-info">
+        <h4>6. Card Grid Dashboard</h4>
+        <p>Cards with rich previews. URL bar at top. Grid layout. Best for: visual overview of all modules.</p>
+      </div>
+    </div>
+    <div class="compare-card" onclick="showDir('d7')">
+      <div class="cc-info">
+        <h4>7. Quiz Review Focus</h4>
+        <p>Persistent review panel on right. Pipeline center. Best for: the passive+review mental model.</p>
+      </div>
+    </div>
+    <div class="compare-card" onclick="showDir('d8')">
+      <div class="cc-info">
+        <h4>8. Light Theme Variant</h4>
+        <p>Direction 1 in light mode. Proves the token system works in both themes. Best for: daytime use.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== DIRECTION 1: COMMAND CENTER ==================== -->
+<section class="direction" id="d1">
+  <div class="dir-header">
+    <h2>Direction 1: Operations Command Center</h2>
+    <p class="subtitle">Kanban-style pipeline columns. Full sidebar navigation. The CI/CD dashboard for learning.</p>
+    <div class="tags">
+      <span class="tag tag-layout">Kanban columns</span>
+      <span class="tag tag-style">Full sidebar</span>
+      <span class="tag tag-pattern">Pipeline-first</span>
+    </div>
+  </div>
+  <div class="mockup-frame">
+    <div class="d1-layout">
+      <div class="d1-sidebar mock-sidebar">
+        <div class="logo"><div class="dot"></div> TrailBlazeAI</div>
+        <div class="nav-item active-item"><span class="icon">◉</span> Dashboard</div>
+        <div class="nav-item"><span class="icon">◎</span> Knowledge Base</div>
+        <div class="nav-item"><span class="icon">◈</span> Quiz Review</div>
+        <div class="nav-item"><span class="icon">◇</span> Settings</div>
+      </div>
+      <div class="d1-main">
+        <div class="mock-topbar">
+          <h3>Pipeline</h3>
+          <div class="mock-search">
+            <span>Search modules, knowledge...</span>
+            <span class="kbd">⌘K</span>
+          </div>
+        </div>
+        <div class="d1-stats">
+          <div class="stat-card">
+            <div class="stat-label">Modules Completed</div>
+            <div class="stat-value" style="color: #22c55e;">47</div>
+            <div class="stat-sub">of 89 total</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Badges Earned</div>
+            <div class="stat-value" style="color: #a5b4fc;">12</div>
+            <div class="stat-sub">3 trails complete</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Quiz Accuracy</div>
+            <div class="stat-value" style="color: #fbbf24;">94%</div>
+            <div class="stat-sub">141 / 150 correct</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Time Saved</div>
+            <div class="stat-value" style="color: #818cf8;">62h</div>
+            <div class="stat-sub">~18h remaining</div>
+          </div>
+        </div>
+        <div class="d1-content">
+          <div class="d1-pipeline-header">
+            <div style="display:flex; gap:8px; align-items:center;">
+              <span class="filter-chip active-chip">All</span>
+              <span class="filter-chip">Admin Trail</span>
+              <span class="filter-chip">Developer Trail</span>
+              <span class="filter-chip">Platform Trail</span>
+            </div>
+            <div class="url-input" style="width: 280px; padding: 6px 12px; font-size: 13px;">
+              <span>+ Add trail URL...</span>
+            </div>
+          </div>
+          <div class="d1-pipeline-cols">
+            <div>
+              <div class="d1-col-header">Queued <span class="d1-col-count">8</span></div>
+              <div class="d1-col-cards">
+                <div class="module-card"><div class="mc-title">Data Security</div><div class="mc-meta"><span class="badge badge-queued">queued</span></div></div>
+                <div class="module-card"><div class="mc-title">Reports & Dashboards</div><div class="mc-meta"><span class="badge badge-queued">queued</span></div></div>
+                <div class="module-card" style="opacity:0.5;"><div class="mc-title">+6 more</div></div>
+              </div>
+            </div>
+            <div>
+              <div class="d1-col-header">Scraping <span class="d1-col-count">2</span></div>
+              <div class="d1-col-cards">
+                <div class="module-card" style="border-color: rgba(34,211,238,0.3);"><div class="mc-title">User Management</div><div class="mc-meta"><span class="badge badge-scraping">scraping</span></div><div class="progress-bar"><div class="fill" style="width:60%;background:#22d3ee;"></div></div></div>
+                <div class="module-card" style="border-color: rgba(34,211,238,0.3);"><div class="mc-title">Apex Triggers</div><div class="mc-meta"><span class="badge badge-scraping">scraping</span></div><div class="progress-bar"><div class="fill" style="width:25%;background:#22d3ee;"></div></div></div>
+              </div>
+            </div>
+            <div>
+              <div class="d1-col-header">Processing <span class="d1-col-count">1</span></div>
+              <div class="d1-col-cards">
+                <div class="module-card" style="border-color: rgba(168,85,247,0.3);"><div class="mc-title">Flow Builder</div><div class="mc-meta"><span class="badge badge-processing">processing</span></div><div class="progress-bar"><div class="fill" style="width:40%;background:#a855f7;"></div></div></div>
+              </div>
+            </div>
+            <div>
+              <div class="d1-col-header" style="color:#fbbf24;">Review <span class="d1-col-count" style="background:rgba(251,191,36,0.15);color:#fbbf24;">3</span></div>
+              <div class="d1-col-cards">
+                <div class="module-card" style="border-color: rgba(251,191,36,0.3);"><div class="mc-title">Process Automation</div><div class="mc-meta"><span class="badge badge-quiz-ready">quiz-ready</span> <span style="font-size:11px;color:#fbbf24;">94%</span></div></div>
+                <div class="module-card" style="border-color: rgba(251,191,36,0.3);"><div class="mc-title">Lightning Web Components</div><div class="mc-meta"><span class="badge badge-quiz-ready">quiz-ready</span> <span style="font-size:11px;color:#fbbf24;">88%</span></div></div>
+                <div class="module-card" style="border-color: rgba(251,191,36,0.3);"><div class="mc-title">Apex Basics</div><div class="mc-meta"><span class="badge badge-quiz-ready">quiz-ready</span> <span style="font-size:11px;color:#22c55e;">97%</span></div></div>
+              </div>
+            </div>
+            <div>
+              <div class="d1-col-header" style="color:#22c55e;">Done <span class="d1-col-count" style="background:rgba(34,197,94,0.12);color:#22c55e;">47</span></div>
+              <div class="d1-col-cards">
+                <div class="module-card" style="border-color: rgba(34,197,94,0.2); opacity:0.7;"><div class="mc-title">Salesforce Fundamentals</div><div class="mc-meta"><span class="badge badge-completed">completed</span> <span style="font-size:11px;">✓ 5/5</span></div></div>
+                <div class="module-card" style="border-color: rgba(34,197,94,0.2); opacity:0.7;"><div class="mc-title">Data Modeling</div><div class="mc-meta"><span class="badge badge-completed">completed</span> <span style="font-size:11px;">✓ 4/4</span></div></div>
+                <div class="module-card" style="opacity:0.4;"><div class="mc-title">+45 more</div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== DIRECTION 2: MINIMAL FOCUS ==================== -->
+<section class="direction" id="d2">
+  <div class="dir-header">
+    <h2>Direction 2: Minimal Focus</h2>
+    <p class="subtitle">Collapsed icon sidebar. Centered URL input hero. Minimal chrome, maximum content.</p>
+    <div class="tags">
+      <span class="tag tag-layout">Icon sidebar</span>
+      <span class="tag tag-style">Hero input</span>
+      <span class="tag tag-pattern">Focused launch</span>
+    </div>
+  </div>
+  <div class="mockup-frame">
+    <div class="d2-layout">
+      <div class="d2-sidebar">
+        <div class="icon-btn" style="margin-bottom:8px;">
+          <div style="width:20px;height:20px;border-radius:6px;background:linear-gradient(135deg,#818cf8,#6366f1);"></div>
+        </div>
+        <div class="icon-btn active-icon">◉</div>
+        <div class="icon-btn">◎</div>
+        <div class="icon-btn">◈</div>
+        <div style="flex:1;"></div>
+        <div class="icon-btn">◇</div>
+      </div>
+      <div class="d2-main">
+        <div class="d2-hero">
+          <h2>What trail are you conquering today?</h2>
+          <div class="url-input">
+            <span style="color:#818cf8;">→</span>
+            <span>Paste a Trailhead trail or module URL...</span>
+          </div>
+        </div>
+        <div class="d2-stats-row">
+          <div class="d2-stat"><div class="val" style="color:#22c55e;">47</div><div class="lbl">Completed</div></div>
+          <div class="d2-stat"><div class="val" style="color:#a5b4fc;">12</div><div class="lbl">Badges</div></div>
+          <div class="d2-stat"><div class="val" style="color:#fbbf24;">94%</div><div class="lbl">Accuracy</div></div>
+          <div class="d2-stat"><div class="val" style="color:#818cf8;">62h</div><div class="lbl">Saved</div></div>
+          <div class="d2-stat"><div class="val">3</div><div class="lbl">Review</div></div>
+        </div>
+        <div class="d2-content">
+          <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
+            <h3 style="font-size:16px; font-weight:600;">Active Pipeline</h3>
+            <div style="display:flex; gap:8px;">
+              <span class="filter-chip active-chip">All</span>
+              <span class="filter-chip">Review (3)</span>
+              <span class="filter-chip">Active (3)</span>
+            </div>
+          </div>
+          <div style="display:flex; flex-direction:column; gap:8px;">
+            <div class="module-card" style="border-color: rgba(251,191,36,0.3); display:flex; align-items:center; justify-content:space-between;">
+              <div>
+                <div class="mc-title">Process Automation</div>
+                <div class="mc-meta"><span class="badge badge-quiz-ready">quiz-ready</span> <span>Admin Trail</span></div>
+              </div>
+              <button class="btn-primary" style="font-size:12px; padding:6px 12px;">Review</button>
+            </div>
+            <div class="module-card" style="border-color: rgba(251,191,36,0.3); display:flex; align-items:center; justify-content:space-between;">
+              <div>
+                <div class="mc-title">Lightning Web Components</div>
+                <div class="mc-meta"><span class="badge badge-quiz-ready">quiz-ready</span> <span>Developer Trail</span></div>
+              </div>
+              <button class="btn-primary" style="font-size:12px; padding:6px 12px;">Review</button>
+            </div>
+            <div class="module-card" style="border-color: rgba(168,85,247,0.3); display:flex; align-items:center; justify-content:space-between;">
+              <div>
+                <div class="mc-title">Flow Builder</div>
+                <div class="mc-meta"><span class="badge badge-processing">processing</span> <span>Admin Trail</span></div>
+              </div>
+              <div class="progress-bar" style="width:80px;"><div class="fill" style="width:40%;background:#a855f7;"></div></div>
+            </div>
+            <div class="module-card" style="border-color: rgba(34,211,238,0.3); display:flex; align-items:center; justify-content:space-between;">
+              <div>
+                <div class="mc-title">User Management</div>
+                <div class="mc-meta"><span class="badge badge-scraping">scraping</span> <span>Admin Trail</span></div>
+              </div>
+              <div class="progress-bar" style="width:80px;"><div class="fill" style="width:60%;background:#22d3ee;"></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== DIRECTION 3: DATA TABLE ==================== -->
+<section class="direction" id="d3">
+  <div class="dir-header">
+    <h2>Direction 3: Dense Data Table</h2>
+    <p class="subtitle">Table-first layout. Sortable columns. Filter toolbar. Maximum information density.</p>
+    <div class="tags">
+      <span class="tag tag-layout">Table view</span>
+      <span class="tag tag-style">Dense</span>
+      <span class="tag tag-pattern">Data-first</span>
+    </div>
+  </div>
+  <div class="mockup-frame">
+    <div class="d3-layout">
+      <div class="d3-sidebar mock-sidebar">
+        <div class="logo"><div class="dot"></div> TrailBlazeAI</div>
+        <div class="nav-item active-item"><span class="icon">◉</span> Modules</div>
+        <div class="nav-item"><span class="icon">◎</span> Knowledge</div>
+        <div class="nav-item"><span class="icon">◈</span> Quizzes</div>
+        <div class="nav-item"><span class="icon">◇</span> Settings</div>
+      </div>
+      <div class="d3-main">
+        <div class="mock-topbar">
+          <h3>All Modules</h3>
+          <div class="mock-search"><span>Search...</span> <span class="kbd">⌘K</span></div>
+        </div>
+        <div class="d3-toolbar">
+          <span class="filter-chip active-chip">All (89)</span>
+          <span class="filter-chip">Quiz Ready (3)</span>
+          <span class="filter-chip">Active (3)</span>
+          <span class="filter-chip">Queued (8)</span>
+          <span class="filter-chip">Done (47)</span>
+          <span class="filter-chip">Error (0)</span>
+          <div style="flex:1;"></div>
+          <div class="url-input" style="width:260px; padding:5px 12px; font-size:12px;">+ Add trail URL...</div>
+        </div>
+        <div class="d3-content">
+          <table class="d3-table">
+            <thead>
+              <tr>
+                <th style="width:30px;"><input type="checkbox" disabled></th>
+                <th>Module</th>
+                <th>Trail</th>
+                <th>Status</th>
+                <th>Confidence</th>
+                <th>Questions</th>
+                <th>Updated</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><input type="checkbox" disabled></td>
+                <td style="font-weight:500;">Process Automation</td>
+                <td style="color:#94a3b8;">Admin Trail</td>
+                <td><span class="badge badge-quiz-ready">quiz-ready</span></td>
+                <td><span style="color:#22c55e; font-family:monospace;">94%</span></td>
+                <td style="font-family:monospace;">5</td>
+                <td style="color:#64748b; font-family:monospace; font-size:12px;">2m ago</td>
+              </tr>
+              <tr>
+                <td><input type="checkbox" disabled></td>
+                <td style="font-weight:500;">Lightning Web Components</td>
+                <td style="color:#94a3b8;">Developer Trail</td>
+                <td><span class="badge badge-quiz-ready">quiz-ready</span></td>
+                <td><span style="color:#fbbf24; font-family:monospace;">88%</span></td>
+                <td style="font-family:monospace;">4</td>
+                <td style="color:#64748b; font-family:monospace; font-size:12px;">5m ago</td>
+              </tr>
+              <tr>
+                <td><input type="checkbox" disabled></td>
+                <td style="font-weight:500;">Apex Basics</td>
+                <td style="color:#94a3b8;">Developer Trail</td>
+                <td><span class="badge badge-quiz-ready">quiz-ready</span></td>
+                <td><span style="color:#22c55e; font-family:monospace;">97%</span></td>
+                <td style="font-family:monospace;">6</td>
+                <td style="color:#64748b; font-family:monospace; font-size:12px;">8m ago</td>
+              </tr>
+              <tr>
+                <td><input type="checkbox" disabled></td>
+                <td style="font-weight:500;">Flow Builder</td>
+                <td style="color:#94a3b8;">Admin Trail</td>
+                <td><span class="badge badge-processing">processing</span></td>
+                <td style="color:#64748b;">—</td>
+                <td style="font-family:monospace;">—</td>
+                <td style="color:#64748b; font-family:monospace; font-size:12px;">now</td>
+              </tr>
+              <tr>
+                <td><input type="checkbox" disabled></td>
+                <td style="font-weight:500;">User Management</td>
+                <td style="color:#94a3b8;">Admin Trail</td>
+                <td><span class="badge badge-scraping">scraping</span></td>
+                <td style="color:#64748b;">—</td>
+                <td style="font-family:monospace;">—</td>
+                <td style="color:#64748b; font-family:monospace; font-size:12px;">now</td>
+              </tr>
+              <tr>
+                <td><input type="checkbox" disabled></td>
+                <td style="font-weight:500;">Data Security</td>
+                <td style="color:#94a3b8;">Admin Trail</td>
+                <td><span class="badge badge-queued">queued</span></td>
+                <td style="color:#64748b;">—</td>
+                <td style="font-family:monospace;">—</td>
+                <td style="color:#64748b; font-family:monospace; font-size:12px;">—</td>
+              </tr>
+              <tr style="opacity:0.6;">
+                <td><input type="checkbox" disabled></td>
+                <td style="font-weight:500;">Salesforce Fundamentals</td>
+                <td style="color:#94a3b8;">Admin Trail</td>
+                <td><span class="badge badge-completed">completed</span></td>
+                <td><span style="color:#22c55e; font-family:monospace;">100%</span></td>
+                <td style="font-family:monospace;">5/5</td>
+                <td style="color:#64748b; font-family:monospace; font-size:12px;">1h ago</td>
+              </tr>
+              <tr style="opacity:0.6;">
+                <td><input type="checkbox" disabled></td>
+                <td style="font-weight:500;">Data Modeling</td>
+                <td style="color:#94a3b8;">Platform Trail</td>
+                <td><span class="badge badge-completed">completed</span></td>
+                <td><span style="color:#22c55e; font-family:monospace;">100%</span></td>
+                <td style="font-family:monospace;">4/4</td>
+                <td style="color:#64748b; font-family:monospace; font-size:12px;">2h ago</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== DIRECTION 4: SPLIT PANEL ==================== -->
+<section class="direction" id="d4">
+  <div class="dir-header">
+    <h2>Direction 4: Split Panel (Linear-style)</h2>
+    <p class="subtitle">Three-panel layout: sidebar + module list + detail view. Click to inspect any module.</p>
+    <div class="tags">
+      <span class="tag tag-layout">Three-panel</span>
+      <span class="tag tag-style">Linear-inspired</span>
+      <span class="tag tag-pattern">List + detail</span>
+    </div>
+  </div>
+  <div class="mockup-frame">
+    <div class="d4-layout">
+      <div class="d4-sidebar mock-sidebar">
+        <div class="logo"><div class="dot"></div> TrailBlazeAI</div>
+        <div class="nav-item active-item"><span class="icon">◉</span> Pipeline</div>
+        <div class="nav-item"><span class="icon">◎</span> Knowledge</div>
+        <div class="nav-item"><span class="icon">◈</span> Review</div>
+        <div class="nav-item"><span class="icon">◇</span> Settings</div>
+      </div>
+      <div class="d4-list">
+        <div class="d4-list-header">
+          <span style="font-size:13px; font-weight:500;">Modules</span>
+          <span style="font-size:12px; color:#64748b;">89</span>
+        </div>
+        <div style="padding:8px 12px; border-bottom: 1px solid rgba(255,255,255,0.06);">
+          <div style="display:flex; gap:6px; flex-wrap:wrap;">
+            <span class="filter-chip active-chip" style="font-size:11px; padding:2px 8px;">All</span>
+            <span class="filter-chip" style="font-size:11px; padding:2px 8px;">Review</span>
+            <span class="filter-chip" style="font-size:11px; padding:2px 8px;">Active</span>
+          </div>
+        </div>
+        <div class="d4-list-items">
+          <div class="d4-list-item selected">
+            <div class="li-title">Process Automation</div>
+            <div class="li-meta"><span class="badge badge-quiz-ready" style="font-size:10px; padding:1px 6px;">quiz-ready</span> Admin Trail</div>
+          </div>
+          <div class="d4-list-item">
+            <div class="li-title">Lightning Web Components</div>
+            <div class="li-meta"><span class="badge badge-quiz-ready" style="font-size:10px; padding:1px 6px;">quiz-ready</span> Developer Trail</div>
+          </div>
+          <div class="d4-list-item">
+            <div class="li-title">Apex Basics</div>
+            <div class="li-meta"><span class="badge badge-quiz-ready" style="font-size:10px; padding:1px 6px;">quiz-ready</span> Developer Trail</div>
+          </div>
+          <div class="d4-list-item">
+            <div class="li-title">Flow Builder</div>
+            <div class="li-meta"><span class="badge badge-processing" style="font-size:10px; padding:1px 6px;">processing</span> Admin Trail</div>
+          </div>
+          <div class="d4-list-item">
+            <div class="li-title">User Management</div>
+            <div class="li-meta"><span class="badge badge-scraping" style="font-size:10px; padding:1px 6px;">scraping</span> Admin Trail</div>
+          </div>
+          <div class="d4-list-item">
+            <div class="li-title">Data Security</div>
+            <div class="li-meta"><span class="badge badge-queued" style="font-size:10px; padding:1px 6px;">queued</span> Admin Trail</div>
+          </div>
+          <div class="d4-list-item" style="opacity:0.6;">
+            <div class="li-title">Salesforce Fundamentals</div>
+            <div class="li-meta"><span class="badge badge-completed" style="font-size:10px; padding:1px 6px;">completed</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="d4-detail">
+        <div class="d4-detail-header">
+          <div style="display:flex; align-items:center; gap:10px; margin-bottom:8px;">
+            <h3 style="font-size:18px; font-weight:600;">Process Automation</h3>
+            <span class="badge badge-quiz-ready">quiz-ready</span>
+          </div>
+          <div style="font-size:12px; color:#64748b;">Admin Trail · 5 quiz questions · 94% avg confidence</div>
+        </div>
+        <div style="margin-bottom:20px;">
+          <div style="font-size:13px; font-weight:500; margin-bottom:8px;">Quiz Questions</div>
+          <div style="display:flex; flex-direction:column; gap:8px;">
+            <div style="padding:10px 12px; border-radius:6px; background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.06);">
+              <div style="font-size:12px; color:#64748b; margin-bottom:4px;">Q1 · <span style="color:#22c55e;">97%</span></div>
+              <div style="font-size:13px;">What is the primary purpose of Process Builder in Salesforce?</div>
+            </div>
+            <div style="padding:10px 12px; border-radius:6px; background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.06);">
+              <div style="font-size:12px; color:#64748b; margin-bottom:4px;">Q2 · <span style="color:#22c55e;">95%</span></div>
+              <div style="font-size:13px;">Which automation tool should you use for complex branching logic?</div>
+            </div>
+            <div style="padding:10px 12px; border-radius:6px; background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.06);">
+              <div style="font-size:12px; color:#64748b; margin-bottom:4px;">Q3 · <span style="color:#fbbf24;">88%</span></div>
+              <div style="font-size:13px;">What is the order of execution for automation in Salesforce?</div>
+            </div>
+          </div>
+        </div>
+        <div style="display:flex; gap:8px; margin-top:auto;">
+          <button class="btn-primary">Approve All (5)</button>
+          <button class="btn-secondary">Review Individual</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== DIRECTION 5: TIMELINE FLOW ==================== -->
+<section class="direction" id="d5">
+  <div class="dir-header">
+    <h2>Direction 5: Timeline Flow</h2>
+    <p class="subtitle">Activity timeline as the primary view. Chronological event stream. GitHub Actions-inspired.</p>
+    <div class="tags">
+      <span class="tag tag-layout">Timeline</span>
+      <span class="tag tag-style">Activity stream</span>
+      <span class="tag tag-pattern">Chronological</span>
+    </div>
+  </div>
+  <div class="mockup-frame">
+    <div class="d5-layout">
+      <div class="d5-sidebar mock-sidebar">
+        <div class="logo"><div class="dot"></div> TrailBlazeAI</div>
+        <div class="nav-item active-item"><span class="icon">◉</span> Activity</div>
+        <div class="nav-item"><span class="icon">◎</span> Modules</div>
+        <div class="nav-item"><span class="icon">◈</span> Knowledge</div>
+        <div class="nav-item"><span class="icon">◇</span> Settings</div>
+      </div>
+      <div class="d5-main">
+        <div class="mock-topbar">
+          <h3>Activity</h3>
+          <div class="mock-search"><span>Search...</span> <span class="kbd">⌘K</span></div>
+        </div>
+        <div class="d5-stats">
+          <div class="stat-card"><div class="stat-label">Completed</div><div class="stat-value" style="color:#22c55e;">47</div><div class="stat-sub">of 89</div></div>
+          <div class="stat-card"><div class="stat-label">Badges</div><div class="stat-value" style="color:#a5b4fc;">12</div></div>
+          <div class="stat-card"><div class="stat-label">Accuracy</div><div class="stat-value" style="color:#fbbf24;">94%</div></div>
+          <div class="stat-card"><div class="stat-label">Saved</div><div class="stat-value" style="color:#818cf8;">62h</div></div>
+        </div>
+        <div class="d5-content">
+          <div style="margin-bottom:16px;">
+            <div class="url-input">
+              <span style="color:#818cf8;">+</span>
+              <span>Paste a trail URL to start processing...</span>
+            </div>
+          </div>
+          <div class="d5-timeline">
+            <div class="d5-event ev-active">
+              <div class="ev-time">Just now</div>
+              <div class="ev-title"><span class="badge badge-quiz-ready" style="margin-right:6px;">quiz-ready</span> Process Automation</div>
+              <div class="ev-desc">5 quiz questions generated. 94% average confidence. Ready for review.</div>
+            </div>
+            <div class="d5-event ev-active">
+              <div class="ev-time">2 min ago</div>
+              <div class="ev-title"><span class="badge badge-processing" style="margin-right:6px;">processing</span> Flow Builder</div>
+              <div class="ev-desc">Extracting knowledge entries from 4 units. 2/4 complete.</div>
+            </div>
+            <div class="d5-event">
+              <div class="ev-time">5 min ago</div>
+              <div class="ev-title"><span class="badge badge-quiz-ready" style="margin-right:6px;">quiz-ready</span> Lightning Web Components</div>
+              <div class="ev-desc">4 quiz questions generated. 88% average confidence.</div>
+            </div>
+            <div class="d5-event">
+              <div class="ev-time">8 min ago</div>
+              <div class="ev-title"><span class="badge badge-quiz-ready" style="margin-right:6px;">quiz-ready</span> Apex Basics</div>
+              <div class="ev-desc">6 quiz questions generated. 97% average confidence.</div>
+            </div>
+            <div class="d5-event">
+              <div class="ev-time">15 min ago</div>
+              <div class="ev-title"><span class="badge badge-completed" style="margin-right:6px;">completed</span> Salesforce Fundamentals</div>
+              <div class="ev-desc">All 5 questions answered correctly. Badge earned: Salesforce Basics.</div>
+            </div>
+            <div class="d5-event">
+              <div class="ev-time">32 min ago</div>
+              <div class="ev-title"><span class="badge badge-completed" style="margin-right:6px;">completed</span> Data Modeling</div>
+              <div class="ev-desc">4/4 correct. Knowledge base updated with 23 entries.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== DIRECTION 6: CARD GRID ==================== -->
+<section class="direction" id="d6">
+  <div class="dir-header">
+    <h2>Direction 6: Card Grid Dashboard</h2>
+    <p class="subtitle">Rich module cards in a responsive grid. URL bar prominent. Visual overview of everything.</p>
+    <div class="tags">
+      <span class="tag tag-layout">Card grid</span>
+      <span class="tag tag-style">Dashboard</span>
+      <span class="tag tag-pattern">Visual overview</span>
+    </div>
+  </div>
+  <div class="mockup-frame">
+    <div class="d6-layout">
+      <div class="d6-sidebar mock-sidebar">
+        <div class="logo"><div class="dot"></div> TrailBlazeAI</div>
+        <div class="nav-item active-item"><span class="icon">◉</span> Dashboard</div>
+        <div class="nav-item"><span class="icon">◎</span> Knowledge</div>
+        <div class="nav-item"><span class="icon">◈</span> Review</div>
+        <div class="nav-item"><span class="icon">◇</span> Settings</div>
+      </div>
+      <div class="d6-main">
+        <div class="mock-topbar">
+          <h3>Dashboard</h3>
+          <div class="mock-search"><span>Search...</span> <span class="kbd">⌘K</span></div>
+        </div>
+        <div class="d6-url-bar">
+          <div class="url-input">
+            <span style="color:#818cf8;">→</span>
+            <span>Paste a Trailhead trail or module URL...</span>
+            <div style="flex:1;"></div>
+            <button class="btn-primary" style="padding:4px 12px; font-size:12px;">Start</button>
+          </div>
+        </div>
+        <div class="d6-grid">
+          <div class="d6-card" style="border-color: rgba(251,191,36,0.3);">
+            <div class="d6-card-header">
+              <span class="title">Process Automation</span>
+              <span class="badge badge-quiz-ready">quiz-ready</span>
+            </div>
+            <div class="d6-card-body">
+              <div class="desc">Learn to automate business processes using Flow Builder, Process Builder, and workflow rules.</div>
+              <div class="progress-bar"><div class="fill" style="width:80%; background:linear-gradient(90deg,#818cf8,#fbbf24);"></div></div>
+            </div>
+            <div class="d6-card-footer">
+              <span>Admin Trail</span>
+              <span>5 questions · <span style="color:#22c55e;">94%</span></span>
+            </div>
+          </div>
+          <div class="d6-card" style="border-color: rgba(251,191,36,0.3);">
+            <div class="d6-card-header">
+              <span class="title">Lightning Web Components</span>
+              <span class="badge badge-quiz-ready">quiz-ready</span>
+            </div>
+            <div class="d6-card-body">
+              <div class="desc">Build reusable UI components with Lightning Web Components framework.</div>
+              <div class="progress-bar"><div class="fill" style="width:80%; background:linear-gradient(90deg,#818cf8,#fbbf24);"></div></div>
+            </div>
+            <div class="d6-card-footer">
+              <span>Developer Trail</span>
+              <span>4 questions · <span style="color:#fbbf24;">88%</span></span>
+            </div>
+          </div>
+          <div class="d6-card" style="border-color: rgba(168,85,247,0.3);">
+            <div class="d6-card-header">
+              <span class="title">Flow Builder</span>
+              <span class="badge badge-processing">processing</span>
+            </div>
+            <div class="d6-card-body">
+              <div class="desc">Master the declarative automation tool for complex business logic.</div>
+              <div class="progress-bar"><div class="fill" style="width:40%; background:#a855f7;"></div></div>
+            </div>
+            <div class="d6-card-footer">
+              <span>Admin Trail</span>
+              <span>Processing 2/4 units</span>
+            </div>
+          </div>
+          <div class="d6-card" style="border-color: rgba(34,211,238,0.3);">
+            <div class="d6-card-header">
+              <span class="title">User Management</span>
+              <span class="badge badge-scraping">scraping</span>
+            </div>
+            <div class="d6-card-body">
+              <div class="desc">Configure user accounts, profiles, permission sets, and security settings.</div>
+              <div class="progress-bar"><div class="fill" style="width:60%; background:#22d3ee;"></div></div>
+            </div>
+            <div class="d6-card-footer">
+              <span>Admin Trail</span>
+              <span>Scraping 3/5 pages</span>
+            </div>
+          </div>
+          <div class="d6-card" style="opacity:0.6;">
+            <div class="d6-card-header">
+              <span class="title">Data Security</span>
+              <span class="badge badge-queued">queued</span>
+            </div>
+            <div class="d6-card-body">
+              <div class="desc">Implement data security with profiles, permission sets, and sharing rules.</div>
+            </div>
+            <div class="d6-card-footer">
+              <span>Admin Trail</span>
+              <span>Waiting</span>
+            </div>
+          </div>
+          <div class="d6-card" style="opacity:0.5; border-color: rgba(34,197,94,0.2);">
+            <div class="d6-card-header">
+              <span class="title">Salesforce Fundamentals</span>
+              <span class="badge badge-completed">completed</span>
+            </div>
+            <div class="d6-card-body">
+              <div class="desc">Core platform concepts, navigation, and basic configuration.</div>
+              <div class="progress-bar"><div class="fill" style="width:100%;"></div></div>
+            </div>
+            <div class="d6-card-footer">
+              <span>Admin Trail</span>
+              <span style="color:#22c55e;">✓ 5/5 correct</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== DIRECTION 7: QUIZ REVIEW FOCUS ==================== -->
+<section class="direction" id="d7">
+  <div class="dir-header">
+    <h2>Direction 7: Quiz Review Focus</h2>
+    <p class="subtitle">Persistent review panel on the right. Pipeline in center. Optimized for the passive+review workflow.</p>
+    <div class="tags">
+      <span class="tag tag-layout">Three-panel + review</span>
+      <span class="tag tag-style">Review-centric</span>
+      <span class="tag tag-pattern">Passive + review</span>
+    </div>
+  </div>
+  <div class="mockup-frame">
+    <div class="d7-layout">
+      <div class="d7-sidebar mock-sidebar">
+        <div class="logo"><div class="dot"></div> TrailBlazeAI</div>
+        <div class="nav-item active-item"><span class="icon">◉</span> Dashboard</div>
+        <div class="nav-item"><span class="icon">◎</span> Knowledge</div>
+        <div class="nav-item"><span class="icon">◇</span> Settings</div>
+      </div>
+      <div class="d7-main">
+        <div class="mock-topbar">
+          <h3>Pipeline</h3>
+          <div style="display:flex; gap:8px; align-items:center;">
+            <div class="url-input" style="width:240px; padding:5px 12px; font-size:12px;">+ Add trail URL...</div>
+            <div class="mock-search" style="padding:5px 10px;"><span class="kbd">⌘K</span></div>
+          </div>
+        </div>
+        <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:12px; padding:16px 20px; border-bottom:1px solid rgba(255,255,255,0.06);">
+          <div class="stat-card" style="padding:12px;"><div class="stat-label">Done</div><div class="stat-value" style="font-size:22px; color:#22c55e;">47/89</div></div>
+          <div class="stat-card" style="padding:12px;"><div class="stat-label">Badges</div><div class="stat-value" style="font-size:22px; color:#a5b4fc;">12</div></div>
+          <div class="stat-card" style="padding:12px;"><div class="stat-label">Accuracy</div><div class="stat-value" style="font-size:22px; color:#fbbf24;">94%</div></div>
+          <div class="stat-card" style="padding:12px;"><div class="stat-label">Saved</div><div class="stat-value" style="font-size:22px; color:#818cf8;">62h</div></div>
+        </div>
+        <div style="padding:16px 20px; flex:1; overflow-y:auto;">
+          <div style="display:flex; flex-direction:column; gap:6px;">
+            <div class="module-card" style="display:flex; align-items:center; gap:12px; border-color:rgba(168,85,247,0.3);">
+              <span class="badge badge-processing">processing</span>
+              <span style="font-size:13px; font-weight:500; flex:1;">Flow Builder</span>
+              <div class="progress-bar" style="width:60px;"><div class="fill" style="width:40%;background:#a855f7;"></div></div>
+            </div>
+            <div class="module-card" style="display:flex; align-items:center; gap:12px; border-color:rgba(34,211,238,0.3);">
+              <span class="badge badge-scraping">scraping</span>
+              <span style="font-size:13px; font-weight:500; flex:1;">User Management</span>
+              <div class="progress-bar" style="width:60px;"><div class="fill" style="width:60%;background:#22d3ee;"></div></div>
+            </div>
+            <div class="module-card" style="display:flex; align-items:center; gap:12px; border-color:rgba(34,211,238,0.3);">
+              <span class="badge badge-scraping">scraping</span>
+              <span style="font-size:13px; font-weight:500; flex:1;">Apex Triggers</span>
+              <div class="progress-bar" style="width:60px;"><div class="fill" style="width:25%;background:#22d3ee;"></div></div>
+            </div>
+            <div class="module-card" style="display:flex; align-items:center; gap:12px; opacity:0.5;">
+              <span class="badge badge-queued">queued</span>
+              <span style="font-size:13px; font-weight:500; flex:1;">Data Security</span>
+            </div>
+            <div class="module-card" style="display:flex; align-items:center; gap:12px; opacity:0.5;">
+              <span class="badge badge-queued">queued</span>
+              <span style="font-size:13px; font-weight:500; flex:1;">Reports & Dashboards</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="d7-review-panel">
+        <div class="d7-review-header">
+          <span style="font-size:14px; font-weight:600;">Review Queue</span>
+          <span class="badge badge-quiz-ready">3 pending</span>
+        </div>
+        <div style="padding:12px 16px; border-bottom:1px solid rgba(255,255,255,0.06); background:rgba(129,140,248,0.04);">
+          <div style="font-size:13px; font-weight:500; margin-bottom:2px;">Process Automation</div>
+          <div style="font-size:11px; color:#64748b;">5 questions · Admin Trail</div>
+        </div>
+        <div class="d7-question">
+          <div class="q-label">QUESTION 1 OF 5</div>
+          <div class="q-text">What is the primary purpose of Process Builder in Salesforce?</div>
+          <div class="d7-answer">
+            <div style="font-size:12px; color:#a5b4fc; margin-bottom:4px; font-weight:500;">AI Answer:</div>
+            Process Builder enables admins to automate business processes by defining criteria and immediate or scheduled actions without code.
+          </div>
+          <div class="d7-confidence">
+            <div class="d7-conf-bar"><div class="fill" style="width:97%;"></div></div>
+            <span>97% confidence</span>
+          </div>
+        </div>
+        <div class="d7-question" style="opacity:0.5;">
+          <div class="q-label">QUESTION 2 OF 5</div>
+          <div class="q-text">Which automation tool should you use for complex branching logic?</div>
+        </div>
+        <div class="d7-actions">
+          <button class="btn-primary">✓ Approve</button>
+          <button class="btn-secondary">Edit</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== DIRECTION 8: LIGHT THEME ==================== -->
+<section class="direction" id="d8">
+  <div class="dir-header">
+    <h2>Direction 8: Light Theme Variant</h2>
+    <p class="subtitle">Direction 1 (Command Center) rendered in light mode. Validates the dual-theme token system.</p>
+    <div class="tags">
+      <span class="tag tag-layout">Command center</span>
+      <span class="tag tag-style">Light mode</span>
+      <span class="tag tag-pattern">Token validation</span>
+    </div>
+  </div>
+  <div class="mockup-frame d8-frame">
+    <div class="d8-layout">
+      <div class="d8-sidebar">
+        <div class="logo"><div class="dot"></div> TrailBlazeAI</div>
+        <div class="nav-item active-item"><span class="icon" style="width:16px; text-align:center;">◉</span> Dashboard</div>
+        <div class="nav-item"><span class="icon" style="width:16px; text-align:center;">◎</span> Knowledge Base</div>
+        <div class="nav-item"><span class="icon" style="width:16px; text-align:center;">◈</span> Quiz Review</div>
+        <div class="nav-item"><span class="icon" style="width:16px; text-align:center;">◇</span> Settings</div>
+      </div>
+      <div class="d8-main">
+        <div class="d8-topbar">
+          <h3>Pipeline</h3>
+          <div class="d8-search"><span>Search modules, knowledge...</span> <span class="kbd" style="background:rgba(0,0,0,0.05); color:#64748b;">⌘K</span></div>
+        </div>
+        <div class="d8-stats">
+          <div class="d8-stat"><div class="stat-label">Modules Completed</div><div class="stat-value" style="color:#16a34a;">47</div><div class="stat-sub">of 89 total</div></div>
+          <div class="d8-stat"><div class="stat-label">Badges Earned</div><div class="stat-value" style="color:#6366f1;">12</div><div class="stat-sub">3 trails complete</div></div>
+          <div class="d8-stat"><div class="stat-label">Quiz Accuracy</div><div class="stat-value" style="color:#d97706;">94%</div><div class="stat-sub">141/150 correct</div></div>
+          <div class="d8-stat"><div class="stat-label">Time Saved</div><div class="stat-value" style="color:#4f46e5;">62h</div><div class="stat-sub">~18h remaining</div></div>
+        </div>
+        <div class="d8-content">
+          <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
+            <div style="display:flex; gap:8px;">
+              <span class="d8-filter-chip active-chip">All</span>
+              <span class="d8-filter-chip">Admin Trail</span>
+              <span class="d8-filter-chip">Developer Trail</span>
+            </div>
+            <div style="padding:6px 12px; border-radius:6px; background:#f1f5f9; border:1px solid #e2e8f0; color:#94a3b8; font-size:12px;">+ Add trail URL...</div>
+          </div>
+          <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap:12px;">
+            <div class="d8-card" style="border-color: #fcd34d;">
+              <div class="mc-title">Process Automation</div>
+              <div class="mc-meta"><span class="badge d8-badge-quiz-ready" style="padding:2px 8px; border-radius:4px; font-size:11px;">quiz-ready</span> <span>Admin Trail · 94%</span></div>
+              <div class="d8-progress-bar"><div class="fill" style="width:80%; background:linear-gradient(90deg,#818cf8,#fbbf24);"></div></div>
+            </div>
+            <div class="d8-card" style="border-color: #fcd34d;">
+              <div class="mc-title">Lightning Web Components</div>
+              <div class="mc-meta"><span class="badge d8-badge-quiz-ready" style="padding:2px 8px; border-radius:4px; font-size:11px;">quiz-ready</span> <span>Developer Trail · 88%</span></div>
+              <div class="d8-progress-bar"><div class="fill" style="width:80%; background:linear-gradient(90deg,#818cf8,#fbbf24);"></div></div>
+            </div>
+            <div class="d8-card" style="border-color: #c084fc;">
+              <div class="mc-title">Flow Builder</div>
+              <div class="mc-meta"><span class="badge d8-badge-processing" style="padding:2px 8px; border-radius:4px; font-size:11px;">processing</span> <span>Admin Trail</span></div>
+              <div class="d8-progress-bar"><div class="fill" style="width:40%; background:#9333ea;"></div></div>
+            </div>
+            <div class="d8-card" style="border-color: #67e8f9;">
+              <div class="mc-title">User Management</div>
+              <div class="mc-meta"><span class="badge d8-badge-quiz-ready" style="padding:2px 8px; border-radius:4px; font-size:11px; background:rgba(34,211,238,0.1); color:#0891b2;">scraping</span> <span>Admin Trail</span></div>
+              <div class="d8-progress-bar"><div class="fill" style="width:60%; background:#06b6d4;"></div></div>
+            </div>
+            <div class="d8-card" style="opacity:0.6;">
+              <div class="mc-title">Data Security</div>
+              <div class="mc-meta"><span class="badge d8-badge-queued" style="padding:2px 8px; border-radius:4px; font-size:11px;">queued</span> <span>Admin Trail</span></div>
+            </div>
+            <div class="d8-card" style="opacity:0.5; border-color:#86efac;">
+              <div class="mc-title">Salesforce Fundamentals</div>
+              <div class="mc-meta"><span class="badge d8-badge-completed" style="padding:2px 8px; border-radius:4px; font-size:11px;">completed</span> <span style="color:#16a34a;">✓ 5/5</span></div>
+              <div class="d8-progress-bar"><div class="fill" style="width:100%;"></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<script>
+function showDir(id) {
+  document.querySelectorAll('.direction').forEach(d => d.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  event.target.classList.add('active');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+</script>
+</body>
+</html>
