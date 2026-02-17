@@ -1,5 +1,5 @@
 ---
-stepsCompleted: [1, 2, 3, 4]
+stepsCompleted: [1, 2, 3, 4, 5]
 inputDocuments:
   - _bmad-output/planning-artifacts/prd.md
   - _bmad-output/planning-artifacts/product-brief-TrailblazeAi-2026-02-17.md
@@ -698,3 +698,137 @@ The architectural decisions above were informed by deep analysis of the followin
 2. **PocketFlow** — Shared-state sequential pipeline, index-based cross-referencing, YAML-validated LLM extraction, progressive context accumulation
 3. **Supabase Official Templates** — 3-file auth pattern (client/server/middleware), getClaims() vs getUser(), Realtime dual-pattern (router.refresh vs useState), pgvector hybrid search RRF function
 4. **AI/RAG Ecosystem Analysis** — Vercel AI SDK embedMany(), ChonkieJS chunking library, Stagehand v3 fallback automation, pg-boss queue-per-stage pattern, LangChain.js rejection rationale
+
+## Implementation Patterns & Consistency Rules
+
+_23 conflict points resolved across 5 categories. All AI agents MUST follow these patterns._
+
+### Naming Patterns
+
+**Database:**
+- Tables: `snake_case`, plural — `modules`, `units`, `sf_knowledge_chunks`, `quiz_items`, `quiz_results`, `agent_logs`, `runs`
+- Columns: `snake_case` — `module_id`, `content_type`, `created_at`, `estimated_cost_usd`
+- Foreign keys: `{referenced_table_singular}_id` — `module_id`, `unit_id`, `quiz_item_id`, `run_id`
+- Indexes: `idx_{table}_{columns}` — `idx_sf_knowledge_chunks_embedding`, `idx_modules_status`
+- Functions: `snake_case` — `hybrid_search()`, `match_chunks()`
+
+**API Endpoints:**
+- Plural nouns, kebab-case for multi-word — `GET /api/modules`, `GET /api/modules/:id/units`, `POST /api/runs`, `GET /api/quiz-results`
+- Route parameters: `:id` format — `/api/modules/:id`, `/api/runs/:runId`
+- Query parameters: `snake_case` — `?trailmix_id=abc&status=pending`
+- Response JSON field naming: `snake_case` (matches database)
+
+**Code:**
+- Files: `kebab-case.ts` everywhere — `quiz-agent.ts`, `hybrid-search.ts`, `module-card.tsx`
+- React components: PascalCase exports — `export function ModuleCard()` in `module-card.tsx`
+- Functions/methods: camelCase — `getModules()`, `processChunk()`, `handleQuizSubmit()`
+- Variables: camelCase — `moduleId`, `chunkText`, `quizResult`
+- Constants: SCREAMING_SNAKE_CASE — `MAX_RETRIES`, `DEFAULT_CHUNK_SIZE`, `CONFIDENCE_THRESHOLD`
+- Types/Interfaces: PascalCase, no `I` prefix — `Module`, `QuizResult`, `ToolTrace`, `PipelineStage`
+- Enums: String union types only, never TS `enum` — `type ModuleStatus = 'pending' | 'scraping' | 'scraped' | 'processing' | 'ready' | 'quizzing' | 'completed' | 'failed'`
+
+**Supabase ↔ TypeScript Bridge:**
+- Use `snake_case` throughout TypeScript when working with database data — no transformation layer
+- Supabase generated types are the source of truth: `Database['public']['Tables']['modules']['Row']`
+- Domain types in `packages/shared/` use snake_case to match: `interface Module { id: string; trailmix_id: string; status: ModuleStatus; }`
+- Only camelCase exception: React component props and event handlers (`onClick`, `onChange`)
+
+### Structure Patterns
+
+**Tests:**
+- Co-located — `quiz-agent.ts` + `quiz-agent.test.ts` in the same directory
+- Naming: `{filename}.test.ts` for unit, `{filename}.integration.test.ts` for integration
+- E2E tests: `apps/web/e2e/` directory
+
+**Components:**
+- Organized by feature — `components/dashboard/`, `components/quiz-review/`, `components/knowledge/`
+- Shared UI primitives: `components/ui/` (shadcn/ui)
+- One component per file, barrel exports (`index.ts`) at feature boundaries
+
+**File Layout:**
+- Utility functions: `lib/` directory in each app — `apps/api/src/lib/`, `apps/web/src/lib/`
+- Config files: root of each app — `apps/api/src/config.ts` (Zod-validated)
+- Agent prompts: `apps/api/src/prompts/{agent-name}.yaml`
+- Database migrations: `packages/db/supabase/migrations/`
+
+### Format Patterns
+
+**API Response Envelope:**
+```typescript
+// Every Fastify route returns this shape
+interface ApiSuccess<T> { data: T; error: null; }
+interface ApiError { data: null; error: { code: string; message: string; details?: unknown; }; }
+type ApiResponse<T> = ApiSuccess<T> | ApiError;
+```
+
+- HTTP status codes are authoritative: 200/201 success, 400/401/404/500 errors
+- Dates: ISO 8601 strings — `"2026-02-17T14:30:00Z"` (Supabase default)
+- Nulls: `null` explicitly, never `undefined` in API responses
+- Empty collections: Always `[]`, never `null`
+- IDs: UUIDs as strings
+- Pagination: `{ data: T[], count: number, offset: number, limit: number }`
+
+### Communication Patterns
+
+**Event Naming:**
+- pg-boss queues: `kebab-case` — `scrape-module`, `extract-content`, `generate-embeddings`, `answer-quiz`
+- Supabase Realtime channels: `kebab-case` — `module-status`, `agent-logs`, `quiz-results`
+- Dead letter queues: `dead-letter-{queue-name}`
+
+**State Management:**
+- Server Components default — data fetched on server, passed as props
+- Client Components only when interactivity needed (`'use client'` directive)
+- Realtime subscriptions: custom hooks in `lib/hooks/` — `use-module-status.ts`, `use-agent-logs.ts`
+- No global state library — Supabase + URL state + React state covers all cases
+- URL state for filters/pagination — `useSearchParams()`
+
+### Process Patterns
+
+**Error Handling:**
+```typescript
+class AppError extends Error {
+  constructor(
+    public readonly code: string,
+    message: string,
+    public readonly status_code: number = 500,
+    public readonly details?: unknown,
+  ) { super(message); this.name = this.constructor.name; }
+}
+class NotFoundError extends AppError {
+  constructor(resource: string, id: string) { super('NOT_FOUND', `${resource} with id ${id} not found`, 404); }
+}
+class ValidationError extends AppError {
+  constructor(message: string, details?: unknown) { super('VALIDATION_ERROR', message, 400, details); }
+}
+class PipelineError extends AppError {
+  constructor(stage: string, message: string, details?: unknown) { super('PIPELINE_ERROR', `${stage}: ${message}`, 500, details); }
+}
+```
+
+- Fastify global error handler maps `AppError` subclasses to API envelope responses
+- Pipeline stage errors logged to `agent_logs` table + pg-boss retry logic
+- Frontend: React Error Boundaries at feature level
+
+**Loading States:**
+- React Suspense boundaries per feature area with `loading.tsx` files
+- Streaming Server Components for initial page loads
+- Skeleton UI components (shadcn/ui Skeleton) for fallbacks
+- Exception: Realtime agent log stream uses `useState` directly (Pattern B from Decision 9)
+
+**Validation:**
+- Zod at all system boundaries: Fastify request bodies, env vars at startup, LLM structured output (one retry on failure), Supabase RPC params
+- Internal function arguments: TypeScript types only, no runtime validation
+- Validation errors → `ValidationError` with Zod error details
+
+### Enforcement Summary
+
+| Do NOT | Do Instead |
+|--------|-----------|
+| `enum Status { Pending }` | `type Status = 'pending' \| 'scraping'` |
+| `interface IModule` | `interface Module` |
+| `UserCard.tsx` (PascalCase file) | `user-card.tsx` (kebab-case file) |
+| `GET /api/module/:id` (singular) | `GET /api/modules/:id` (plural) |
+| `{ loading: true }` manual state | `<Suspense fallback={<Skeleton />}>` |
+| `throw new Error('not found')` | `throw new NotFoundError('module', id)` |
+| `camelCase` in API JSON responses | `snake_case` matching DB columns |
+| Global Redux/Zustand store | Supabase as source of truth |
