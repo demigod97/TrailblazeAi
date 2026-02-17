@@ -1,5 +1,5 @@
 ---
-stepsCompleted: [1, 2, 3, 4, 5, 6, 7, 8]
+stepsCompleted: [1, 2, 3, 4, 5, 6, 7, 8, 9]
 inputDocuments:
   - _bmad-output/planning-artifacts/product-brief-TrailblazeAi-2026-02-17.md
   - _bmad-output/planning-artifacts/prd.md
@@ -646,3 +646,72 @@ All spacing derives from a 4px base, creating consistent visual rhythm.
 - Pipeline status changes announced via `aria-live="polite"` region
 - Hero stat cards include descriptive `aria-label` (e.g., "47 of 89 modules completed")
 - Quiz review panel uses `role="dialog"` with proper labeling
+
+## Design Direction Decision
+
+### Design Directions Explored
+
+Eight visual directions were generated and evaluated against the core experience model (URL submission → passive pipeline → quiz review). Full interactive mockups available at `ux-design-directions.html`.
+
+1. **Operations Command Center** — Kanban pipeline columns with full sidebar. Strong pipeline visibility, but quiz review requires navigating away.
+2. **Minimal Focus** — Collapsed icon sidebar with hero URL input. Clean launch, but deprioritizes pipeline monitoring and review.
+3. **Dense Data Table** — Table-first with sortable columns. Maximum information density, but lacks the spatial pipeline metaphor.
+4. **Split Panel (Linear-style)** — Three-panel list + detail. Strong for deep-diving into individual modules, but review isn't persistent.
+5. **Timeline Flow** — Chronological activity stream. Good for passive monitoring, but treats everything as flat events without hierarchy.
+6. **Card Grid Dashboard** — Rich cards in responsive grid. Visual and scannable, but review is a separate view.
+7. **Quiz Review Focus** — Pipeline center + persistent review panel on right. Purpose-built for the passive + review mental model.
+8. **Light Theme Variant** — Direction 1 in light mode. Validates the dual-theme token system works correctly across both themes.
+
+### Chosen Direction
+
+**Direction 7: Quiz Review Focus** — a three-column layout with persistent review panel.
+
+- **Left column (220px):** Navigation sidebar with icon + label. Pages: Dashboard, Knowledge Base, Settings.
+- **Center column (flexible):** Pipeline view with stat cards at top, URL input bar, and module list showing all active/queued/completed items with status badges and progress indicators.
+- **Right column (340px):** Persistent review panel showing the current review queue. Displays quiz questions one at a time with AI-generated answers, confidence scores, and approve/edit actions. Collapses when no modules are quiz-ready.
+
+### Design Rationale
+
+Direction 7 was chosen because it directly maps to the product's core mental model:
+
+- **Act 1 (Submit):** URL input is prominently placed in the center column's toolbar area, always accessible without navigating to a different page.
+- **Act 2 (Watch):** The center column is a real-time pipeline view — modules flow from queued → scraping → processing → quiz-ready with live status badges and progress bars. This is the "passive" phase where the user watches automation work.
+- **Act 3 (Review):** The persistent right panel means quiz-ready modules surface immediately without context-switching. The user sees a question, sees the AI answer with confidence, and clicks approve or edit. This is the only moment requiring active participation.
+- **No mode-switching:** Unlike directions that require navigating between pipeline and review views, Direction 7 keeps both visible simultaneously. The user never loses pipeline context while reviewing quizzes.
+- **Review panel collapses gracefully:** When nothing needs review, the right panel collapses and the pipeline expands to fill the space, avoiding wasted screen real estate.
+
+### Implementation Approach
+
+**Layout structure (CSS Grid):**
+
+| State | Grid Template Columns |
+|-------|----------------------|
+| Review open | `220px 1fr 340px` |
+| Review collapsed | `220px 1fr 0px` |
+| Sidebar collapsed (tablet) | `48px 1fr 340px` |
+| Mobile | Single column, bottom tab bar |
+
+**Component breakdown:**
+
+| Component | Purpose |
+|-----------|---------|
+| `AppShell` | Root layout with CSS Grid columns, manages panel visibility |
+| `Sidebar` | Navigation with active state, collapsible to 48px icons on tablet |
+| `PipelineView` | Center content: stats bar, URL input, module list |
+| `ReviewPanel` | Right panel: review queue header, question display, answer card, confidence bar, approve/edit actions |
+| `ModuleRow` | Compact row with status badge, progress bar, trail label |
+| `QuizQuestion` | Single question with AI answer, confidence score, action buttons |
+| `StatCard` | Hero metric (completed, badges, accuracy, time saved) |
+
+**State transitions:**
+- Review panel slides in (200ms ease) when first module reaches quiz-ready status
+- Panel width animates between 0px and 340px
+- `prefers-reduced-motion` makes the transition instant
+
+**Responsive breakpoints:**
+
+| Breakpoint | Behavior |
+|-----------|----------|
+| Desktop (≥1024px) | Three-column layout as designed |
+| Tablet (768–1023px) | Sidebar collapses to icons, review panel becomes a slide-over |
+| Mobile (<768px) | Single column, sidebar becomes bottom tab bar, review is a full-screen modal |
