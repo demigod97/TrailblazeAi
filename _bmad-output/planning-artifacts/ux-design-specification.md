@@ -1,5 +1,5 @@
 ---
-stepsCompleted: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+stepsCompleted: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
 inputDocuments:
   - _bmad-output/planning-artifacts/product-brief-TrailblazeAi-2026-02-17.md
   - _bmad-output/planning-artifacts/prd.md
@@ -1140,3 +1140,185 @@ apps/web/src/components/
 - Knowledge entry detail view
 - Concept relationship links
 - Cmd+K omnibar integration (shadcn `Command`)
+
+## UX Consistency Patterns
+
+### Button Hierarchy
+
+**Three tiers, strictly enforced:**
+
+| Tier | Style | Usage | Examples |
+|------|-------|-------|----------|
+| **Primary** | Solid indigo (`bg-primary text-primary-foreground`) | One per visible context. The single action the user should take next. | "Approve", "Start", "Save" |
+| **Secondary** | Ghost with border (`bg-transparent border text-foreground`) | Alternative to primary. Lower visual weight. | "Edit", "Cancel", "Retry" |
+| **Tertiary** | Text-only (`text-muted-foreground hover:text-foreground`) | Least important. Never competes with primary. | "Skip", "Dismiss", "View all" |
+
+**Rules:**
+- Never place two primary buttons adjacent to each other — if both actions are equally important, both are secondary
+- Primary button always on the left in action pairs (Approve | Edit), matching natural reading order
+- Destructive actions (if any) use `destructive` variant — never primary
+- Disabled buttons show `opacity-50 cursor-not-allowed` — never hidden (user should know the action exists)
+- Button minimum touch target: 44x44px on mobile, 32x32px on desktop
+- Icon-only buttons always have `aria-label` and `Tooltip`
+
+### Feedback Patterns
+
+**Toast notifications (via Sonner):**
+
+| Type | Color | Icon | Duration | Example |
+|------|-------|------|----------|---------|
+| Success | Green left border | Checkmark | 3s auto-dismiss | "Module completed — 5/5 correct" |
+| Error | Red left border | X circle | Persistent until dismissed | "Import failed — invalid Trailhead URL" |
+| Warning | Amber left border | Alert triangle | 5s auto-dismiss | "Session expiring — re-authenticate soon" |
+| Info | Indigo left border | Info circle | 3s auto-dismiss | "3 modules added to queue" |
+
+**Rules:**
+- Toasts appear bottom-right, stacked with 8px gap
+- Maximum 3 visible toasts — oldest auto-dismissed when 4th arrives
+- Error toasts are persistent (user must dismiss) — errors should not silently disappear
+- Toasts never contain actions beyond "Dismiss" — if action needed, use inline UI instead
+- `prefers-reduced-motion`: no slide-in animation, instant appear/disappear
+
+**Inline feedback (on components):**
+
+| Feedback | Mechanism | Example |
+|----------|-----------|---------|
+| Status change | Badge color transition (150ms) | queued → scraping badge swap |
+| Progress | Progress bar fill animation (300ms ease) | Scraping 60% → 65% |
+| Approval | Brief green flash on answer card (200ms), then auto-advance | Quiz answer approved |
+| Validation error | Red border + error text below input (instant) | Invalid URL format |
+| Loading | Skeleton placeholder matching component shape | Stats loading, list loading |
+
+**Real-time updates:**
+- Pipeline status changes appear instantly (SSE/polling) — no manual refresh needed
+- Stat card numbers animate when changing (count up/down, 300ms)
+- New quiz-ready modules trigger review panel entrance if panel was collapsed
+- All real-time updates announced via `aria-live="polite"` — never `"assertive"` (not urgent enough to interrupt)
+
+### Loading & Empty States
+
+**Loading states (Skeleton pattern):**
+
+| Component | Skeleton Shape |
+|-----------|---------------|
+| StatCard | Rectangular block matching label + value + sub-label areas |
+| ModuleRow | Horizontal bar matching badge + title + trail label widths |
+| ReviewPanel | Question block + answer block + button row |
+| Knowledge results | Repeated title + subtitle rows |
+
+**Rules:**
+- Skeleton uses `bg-muted animate-pulse` (standard shadcn pattern)
+- Skeleton shapes match final component dimensions exactly — no layout shift on load
+- Show skeleton for minimum 200ms even if data arrives faster — prevents flash
+- `prefers-reduced-motion`: skeleton uses static `bg-muted` without pulse animation
+
+**Empty states:**
+
+| Context | Empty State Content |
+|---------|-------------------|
+| Dashboard (no trails) | Centered: "Paste a Trailhead URL to get started" with focused URL input. No illustration — just the input. |
+| Pipeline (all complete) | Stats at top show final numbers. Module list shows completed items. Clean, quiet "done." |
+| Review panel (nothing to review) | Panel collapsed. No empty state message — absence is the message. |
+| Knowledge base (no content) | "Process some Trailhead modules to build your knowledge base." |
+| Filter with no results | "No modules match this filter." with link to clear filter. |
+| Error list (no errors) | Filter chip shows "Error (0)" — muted but visible. No separate empty state. |
+
+**Rules:**
+- Empty states are never cute or elaborate — one sentence max, actionable when possible
+- No illustrations, mascots, or decorative elements in empty states
+- If the empty state has an obvious next action, include it inline (e.g., URL input in empty dashboard)
+
+### Navigation Patterns
+
+**Sidebar navigation:**
+- Active page: highlighted background (`bg-accent`) + indigo right border (2px)
+- Hover: subtle background (`bg-accent/50`)
+- Badge counts on nav items when pending items exist (e.g., "Review (3)")
+- Badge counts use muted style — never red/urgent unless truly critical
+
+**Cmd+K omnibar:**
+- Opens centered dialog (shadcn `Command` component)
+- Three result sections: Modules, Knowledge, Actions
+- Keyboard: arrow keys navigate, Enter selects, Escape closes
+- Focus trapped in dialog while open — returns to previous element on close
+- Debounced search: 300ms delay before querying
+- Recent searches shown when input is empty
+
+**Filter chips (pipeline + knowledge base):**
+- Single-select within a filter group
+- Active chip: indigo background accent + indigo border
+- Inactive chip: transparent + muted border
+- Chips include count in parentheses: "Review (3)"
+- Counts update in real-time as pipeline state changes
+- "All" chip always first, always available
+
+**Page transitions:**
+- No page transition animations — instant swap (Next.js App Router default)
+- Sidebar active state updates instantly on navigation
+- Review panel state persists across page navigations (stored in React state / URL params)
+
+### Form Patterns
+
+**URL input (primary form element):**
+- Always visible in pipeline toolbar — no "Add" button to reveal it
+- Auto-focus on empty dashboard (first visit)
+- Validates on blur and on submit
+- Validation: must match Trailhead URL pattern (`trailhead.salesforce.com/*`)
+- Error shown inline below input: red border + red text
+- Success: input clears, pipeline populates, no success message (the populated list IS the success)
+
+**Answer editing (quiz review):**
+- Click "Edit" → answer card becomes editable `Textarea`
+- Textarea auto-sizes to content (min 3 rows, max 8 rows)
+- "Save" and "Cancel" buttons replace "Approve" and "Edit"
+- Cancel reverts to original AI answer — no data loss
+- No character limit on edited answers
+- Edited answers visually marked: "Edited" label replaces confidence score
+
+**Settings forms:**
+- Standard vertical field layout: label above input, 12px gap between fields
+- Field groups separated by 24px
+- Save on explicit action (Save button), not auto-save — settings changes should be intentional
+- Validation errors shown inline below each field
+
+### Search & Filtering Patterns
+
+**Knowledge base search:**
+- Search input at top of knowledge page, always visible
+- Results appear as user types (debounced 300ms)
+- Results show: chunk title, source module name, relevance score (monospace, muted)
+- Click result → detail panel shows full content
+- No pagination — virtual scroll for large result sets
+- Empty search shows recent/popular entries
+
+**Pipeline filtering:**
+- Filter chips in toolbar (defined above in Navigation Patterns)
+- Filters are additive to search — Cmd+K search within filtered results
+- Filter state reflected in URL params (bookmarkable, shareable)
+- Clear all filters: click "All" chip
+
+**Sort behavior:**
+- Pipeline list default sort: quiz-ready first → active (by stage) → queued → completed (faded)
+- Knowledge results sorted by relevance score (default) or recency (toggle)
+- Sort preference persists in local storage
+
+### Transition & Animation Patterns
+
+**Standard transitions:**
+
+| Element | Property | Duration | Easing | Trigger |
+|---------|----------|----------|--------|---------|
+| Review panel | width | 200ms | ease | Quiz-ready module arrives/clears |
+| Badge color | background-color, color | 150ms | ease | Status change |
+| Progress bar fill | width | 300ms | ease | Progress update |
+| Stat card value | opacity (cross-fade) | 300ms | ease | Value change |
+| Module row hover | border-color | 150ms | ease | Mouse enter/leave |
+| Toast enter | translate-y + opacity | 200ms | ease-out | Notification arrives |
+| Toast exit | opacity | 150ms | ease-in | Auto-dismiss or manual |
+| Filter chip | background, border-color | 100ms | ease | Click |
+
+**`prefers-reduced-motion: reduce` overrides:**
+- All transitions set to `duration: 0ms` — instant state changes
+- Skeleton pulse animation disabled — static muted background
+- Toast enter/exit: instant appear/disappear
+- Stat card values: instant swap, no cross-fade
