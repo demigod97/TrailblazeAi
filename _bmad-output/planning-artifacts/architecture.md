@@ -1,5 +1,5 @@
 ---
-stepsCompleted: [1, 2, 3, 4, 5, 6]
+stepsCompleted: [1, 2, 3, 4, 5, 6, 7]
 inputDocuments:
   - _bmad-output/planning-artifacts/prd.md
   - _bmad-output/planning-artifacts/product-brief-TrailblazeAi-2026-02-17.md
@@ -1223,3 +1223,172 @@ docker compose -f docker/docker-compose.yml up -d --build
 
 @trailblaze/shared ──→ (no internal deps)
 ```
+
+## Architecture Validation Results
+
+### Coherence Validation
+
+**Decision Compatibility:** PASS
+
+All technology choices are compatible and version-aligned:
+- Next.js 15 + React 19 + @supabase/ssr 0.5 — verified compatible (SSR cookie handling)
+- Fastify 5.2 + pg-boss 10 — pg-boss uses Supabase's PostgreSQL directly, no Redis conflict
+- AI SDK v5 + @ai-sdk/anthropic 2 + @ai-sdk/openai — unified provider interface for both Claude and OpenAI embeddings
+- Playwright MCP (stdio transport) runs inside Worker container, isolated from API container
+- Tailwind CSS v4 + shadcn/ui new-york — CSS-first config via `@import "tailwindcss"`, compatible with Next.js 15
+- Vitest + Playwright — Vitest for unit/integration, Playwright for E2E, no test runner conflicts
+- Zod 3.24 — used consistently for env validation (API config), request validation (Fastify routes), LLM structured output validation
+
+No version conflicts or incompatibilities found.
+
+**Pattern Consistency:** PASS
+
+- Naming conventions are consistent: `snake_case` for DB/API JSON, `camelCase` for TS functions/vars, `kebab-case` for files/routes/queues, PascalCase for types/components
+- The Supabase ↔ TypeScript bridge pattern (no transformation layer, snake_case throughout DB operations) is consistently applied across Decision 12 (schema), patterns (naming), and structure (generated types)
+- Error handling pattern (AppError hierarchy → Fastify global handler → ApiResponse envelope) is consistently referenced in Decisions 9, 11, and Process Patterns
+- Job queue naming (`kebab-case`) aligns with Decision 8 queue definitions and Communication Patterns
+
+**Structure Alignment:** PASS
+
+- Project structure supports all 15 architectural decisions:
+  - Decision 1 (Hybrid): `apps/web/` (Vercel), `apps/api/` (VPS), `packages/db/` (Supabase)
+  - Decision 2 (Playwright MCP): `apps/api/src/lib/mcp-client.ts` + `stagehand-fallback.ts`
+  - Decision 3 (Pipeline): `apps/api/src/pipeline/stages/` with 6 dedicated stage files
+  - Decision 7 (Agents): `apps/api/src/agents/` with 4 agent files + `prompts/` YAML
+  - Decision 8 (pg-boss): `apps/api/src/plugins/pg-boss.ts` + `pipeline/queue-handlers.ts`
+  - Decision 12 (Migrations): `packages/db/supabase/migrations/` with 7 migration files
+  - Decision 14 (Docker): `docker/` with 3 containers defined
+
+### Requirements Coverage Validation
+
+**Functional Requirements Coverage:** PASS — All 37 FRs mapped
+
+| FR Range | Coverage | Key Decisions & Files |
+|----------|----------|----------------------|
+| FR1-FR7 (Content Acquisition) | FULL | Decision 2 (Playwright MCP), `scraper-agent.ts`, `mcp-client.ts`, `stagehand-fallback.ts` |
+| FR8-FR12 (Knowledge Processing) | FULL | Decision 3 (Pipeline), Decision 4 (ChonkieJS), `pipeline/stages/*` |
+| FR13-FR16 (Knowledge Retrieval) | FULL | Decision 6 (Hybrid Search), `007_functions.sql`, `knowledge.ts` route |
+| FR17-FR22 (Quiz Automation) | FULL | Decision 7 (Agents), `quiz-agent.ts`, `quiz-agent.yaml`, `quiz-results.ts` route |
+| FR23-FR28 (Pipeline Orchestration) | FULL | Decision 8 (pg-boss), `queue-handlers.ts`, `concurrency.ts`, `pg-boss.ts` plugin |
+| FR29-FR34 (System Operations) | FULL | Decision 11 (ToolTrace), Decision 14 (Docker), `health.ts`, `progress.ts`, `cost-tracker.ts` |
+| FR35-FR37 (Knowledge Export) | FULL | Decision 6 (Hybrid Search), `knowledge.ts` route, knowledge page |
+
+**Non-Functional Requirements Coverage:** PASS
+
+| NFR Category | Architectural Support |
+|-------------|----------------------|
+| Performance | HNSW index (Decision 5), batched embeddings (Decision 5), concurrent pipeline stages (Decision 8), hybrid search <2s (Decision 6) |
+| Security | 3-layer auth (Decision 10), RLS policies, Bearer token, env-only secrets, Docker volume isolation |
+| Reliability | pg-boss retries with backoff (Decision 8), dead letter queues, Supabase state persistence, module state machine (Decision 12) |
+| Integration | MCP stdio transport (Decision 2), Supabase connection pooling, LLM retry on 429 (AI SDK built-in), configurable timeouts |
+| Cost | Model tiering Haiku/Sonnet (Decision 7/15), prompt caching, batch API, embedding batching — estimated $5-9 one-time |
+| Observability | ToolTrace pattern (Decision 11), Pino structured logging, cost tracking aggregation, `agent_logs` table |
+
+### Implementation Readiness Validation
+
+**Decision Completeness:** PASS
+
+- All 15 decisions include specific versions, code examples, and rationale
+- Trade-offs documented for every major decision (alternatives rejected)
+- Implementation patterns provide 23 conflict-point resolutions with concrete examples
+- Enforcement summary table provides quick-reference "Do NOT / Do Instead" pairs
+
+**Structure Completeness:** PASS
+
+- Complete directory tree with ~80 files/directories defined
+- Every file has a purpose annotation
+- All 7 database migrations specified with scope
+- Integration points diagrammed (ASCII architecture diagram + data flow pipeline)
+
+**Pattern Completeness:** PASS
+
+- Naming patterns cover all 5 domains (DB, API, code, files, events)
+- Error handling hierarchy fully typed with 4 error classes
+- API response envelope defined with TypeScript generics
+- Loading state patterns specified per component type (Suspense vs useState)
+- Validation boundaries clearly drawn (Zod at system edges, TS types internally)
+
+### Gap Analysis Results
+
+**Critical Gaps:** None identified
+
+**Important Gaps (addressable during implementation):**
+
+1. **Middleware auth implementation detail** — Decision 10 specifies `getClaims()` in middleware but the exact redirect-to-login logic is deferred to implementation. Not blocking — standard Supabase SSR pattern.
+2. **Stagehand fallback trigger conditions** — Decision 2 says "use for Shadow DOM extraction failures" but the specific error detection heuristic (how the agent decides to fall back) will be refined during scraper agent development.
+3. **Batch API integration** — Decision 15 mentions Claude Batch API for non-urgent processing. The queue handler needs a mode switch (real-time vs batch). Implementable as a pg-boss job option.
+
+**Nice-to-Have Gaps:**
+
+1. **Monitoring/alerting** — No external monitoring (Uptime Kuma, etc.) specified. Docker `healthcheck` directives would be beneficial.
+2. **Backup strategy** — Supabase handles database backups automatically on Pro plan. No explicit backup for Docker volumes (playwright profiles).
+3. **CI/CD pipeline detail** — `ci.yml` referenced in structure but contents not specified. Standard type-check + test + build pipeline.
+
+### Architecture Completeness Checklist
+
+**Requirements Analysis**
+
+- [x] Project context thoroughly analyzed (37 FRs, 25 NFRs, 6 cross-cutting concerns)
+- [x] Scale and complexity assessed (Medium-High, ~12 major components)
+- [x] Technical constraints identified (Hetzner CX33, Vercel Hobby, Supabase Free, no Trailhead API)
+- [x] Cross-cutting concerns mapped (session management, error recovery, cost tracking, real-time, concurrency, state machine)
+
+**Architectural Decisions**
+
+- [x] 15 critical decisions documented with versions and code examples
+- [x] Technology stack fully specified (Next.js 15, Fastify 5, Supabase, pg-boss 10, AI SDK v5, Playwright MCP)
+- [x] Integration patterns defined (MCP stdio, Supabase Realtime dual-pattern, pg-boss queue chaining)
+- [x] Performance considerations addressed (HNSW indexes, batched APIs, model tiering, concurrency limits)
+
+**Implementation Patterns**
+
+- [x] Naming conventions established (5 domains, 23 conflict points resolved)
+- [x] Structure patterns defined (co-located tests, feature-organized components, migration sequence)
+- [x] Communication patterns specified (pg-boss queues, Realtime channels, dead letter queues)
+- [x] Process patterns documented (error hierarchy, loading states, validation boundaries)
+
+**Project Structure**
+
+- [x] Complete directory structure defined (~80 files across 4 packages)
+- [x] Component boundaries established (Server vs Client, API vs Worker, anon vs service role)
+- [x] Integration points mapped (ASCII diagrams, data flow pipeline)
+- [x] Requirements to structure mapping complete (all 37 FRs → specific files)
+
+### Architecture Readiness Assessment
+
+**Overall Status:** READY FOR IMPLEMENTATION
+
+**Confidence Level:** High
+
+**Key Strengths:**
+
+1. **Zero external dependencies beyond core stack** — No Redis, no LangChain, no separate vector DB. Everything runs on Supabase PostgreSQL + pg-boss.
+2. **Crash-resilient pipeline** — Every stage writes state to Supabase. VPS restart resumes from last completed stage, not from scratch.
+3. **Cost-optimized by design** — Model tiering (Haiku for bulk, Sonnet for accuracy-critical), prompt caching, batch API. Estimated $5-9 one-time for 100 modules.
+4. **Single source of truth** — Supabase is the only shared state. No cache invalidation problems, no eventual consistency issues between services.
+5. **Comprehensive conflict prevention** — 23 naming/pattern conflict points resolved upfront with enforcement table.
+
+**Areas for Future Enhancement:**
+
+1. Multi-user support (currently single-user with RLS future-proofed)
+2. External monitoring/alerting (Uptime Kuma, PagerDuty)
+3. CI/CD pipeline with Docker build + deploy automation
+4. Horizontal scaling of worker containers (currently single worker)
+
+### Implementation Handoff
+
+**AI Agent Guidelines:**
+
+- Follow all 15 architectural decisions exactly as documented
+- Use implementation patterns consistently — refer to the Enforcement Summary table for quick checks
+- Respect project structure and boundaries — every new file must follow the directory conventions
+- Use `snake_case` for all database-related TypeScript code (no camelCase transformation layer)
+- Refer to this document for all architectural questions before making implementation decisions
+
+**First Implementation Priorities:**
+
+1. Database schema — Apply migrations 001-007 to Supabase
+2. API foundation — Fastify plugins (auth, error handler, pg-boss), route stubs
+3. Frontend shell — Three-column layout, sidebar navigation, Supabase auth flow
+4. Pipeline skeleton — pg-boss queue creation, stage handler stubs, basic chaining
+5. Scraper agent MVP — Playwright MCP integration, single module scrape flow
