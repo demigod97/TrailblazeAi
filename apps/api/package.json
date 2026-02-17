@@ -1,0 +1,31 @@
+{
+  "name": "@trailblaze/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsup src/index.ts --format esm --dts",
+    "start": "node dist/index.js",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@ai-sdk/anthropic": "^2",
+    "@ai-sdk/mcp": "^0",
+    "@fastify/bearer-auth": "^10",
+    "@fastify/cors": "^11",
+    "@fastify/rate-limit": "^10",
+    "@trailblaze/db": "workspace:*",
+    "@trailblaze/shared": "workspace:*",
+    "ai": "^5",
+    "fastify": "^5.2",
+    "pg-boss": "^10",
+    "zod": "^3.24"
+  },
+  "devDependencies": {
+    "@types/node": "^22",
+    "tsup": "^8",
+    "tsx": "^4.19",
+    "typescript": "^5.7"
+  }
+}

@@ -1,0 +1,88 @@
+# Workflow Status Template
+
+# This tracks progress through BMM methodology Analysis, Planning, and Solutioning phases.
+# Implementation phase is tracked separately in sprint-status.yaml
+
+# STATUS DEFINITIONS:
+# ==================
+# Initial Status (before completion):
+#   - required: Must be completed to progress
+#   - optional: Can be completed but not required
+#   - recommended: Strongly suggested but not required
+#   - conditional: Required only if certain conditions met (e.g., if_has_ui)
+#
+# Completion Status:
+#   - {file-path}: File created/found (e.g., "docs/product-brief.md")
+#   - skipped: Optional/conditional workflow that was skipped
+
+generated: "2026-02-17"
+project: "TrailblazeAi"
+project_type: "complex-system"
+selected_track: "bmad-method"
+field_type: "greenfield"
+workflow_path: "_bmad/bmm/workflows/workflow-status/paths/method-greenfield.yaml"
+workflow_status:
+  # Phase 1: Analysis (Optional)
+  brainstorm-project:
+    status: "skipped"
+    agent: "analyst"
+    command: "/bmad:bmm:workflows:brainstorming"
+    note: "Not needed - comprehensive research already completed"
+
+  research:
+    status: "_bmad-output/planning-artifacts/research/"
+    agent: "analyst"
+    command: "/bmad:bmm:workflows:research"
+    note: "Complete - 2 research documents exist (Architecture Blueprint + Action Plan)"
+
+  product-brief:
+    status: "_bmad-output/planning-artifacts/product-brief-TrailblazeAi-2026-02-17.md"
+    agent: "analyst"
+    command: "/bmad:bmm:workflows:create-product-brief"
+    note: "Complete - 5 sections: Executive Summary, Core Vision, Target Users, Success Metrics, MVP Scope"
+
+  # Phase 2: Planning
+  prd:
+    status: "_bmad-output/planning-artifacts/prd.md"
+    agent: "pm"
+    command: "/bmad:bmm:workflows:prd"
+    note: "Complete - 12-step create workflow: Executive Summary, Success Criteria, Product Scope, User Journeys, Domain Requirements, Innovation, Web App Requirements, 37 FRs, 25 NFRs, polished"
+
+  create-ux-design:
+    status: "conditional"
+    condition: "if_has_ui"
+    agent: "ux-designer"
+    command: "/bmad:bmm:workflows:create-ux-design"
+    note: "Determined after PRD - user/agent decides if needed"
+
+  # Phase 3: Solutioning
+  create-architecture:
+    status: "required"
+    agent: "architect"
+    command: "/bmad:bmm:workflows:create-architecture"
+    note: "Complete system design for greenfield project"
+
+  create-epics-and-stories:
+    status: "required"
+    agent: "pm"
+    command: "/bmad:bmm:workflows:create-epics-and-stories"
+    note: "Break down PRD into implementable epics and stories"
+
+  test-design:
+    status: "optional"
+    agent: "tea"
+    command: "/bmad:bmm:workflows:testarch-test-design"
+    note: "System-level testability review before gate check"
+
+  implementation-readiness:
+    status: "required"
+    agent: "architect"
+    command: "/bmad:bmm:workflows:check-implementation-readiness"
+    note: "Validates PRD + Architecture + Epics + UX"
+
+  # Phase 4: Implementation
+  sprint-planning:
+    status: "required"
+    agent: "sm"
+    command: "/bmad:bmm:workflows:sprint-planning"
+    note: "Creates sprint plan - subsequent work tracked in sprint-status.yaml"
