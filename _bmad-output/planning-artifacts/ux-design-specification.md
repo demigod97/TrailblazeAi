@@ -1,5 +1,5 @@
 ---
-stepsCompleted: [1, 2, 3, 4, 5, 6, 7, 8, 9]
+stepsCompleted: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 inputDocuments:
   - _bmad-output/planning-artifacts/product-brief-TrailblazeAi-2026-02-17.md
   - _bmad-output/planning-artifacts/prd.md
@@ -715,3 +715,195 @@ Direction 7 was chosen because it directly maps to the product's core mental mod
 | Desktop (≥1024px) | Three-column layout as designed |
 | Tablet (768–1023px) | Sidebar collapses to icons, review panel becomes a slide-over |
 | Mobile (<768px) | Single column, sidebar becomes bottom tab bar, review is a full-screen modal |
+
+## User Journey Flows
+
+### Journey 1: Trail Submission & Pipeline Run (Happy Path)
+
+**Entry point:** User lands on Dashboard with empty pipeline state.
+
+```mermaid
+flowchart TD
+    A[Dashboard loads — empty state] --> B[URL input focused with placeholder text]
+    B --> C{User pastes trail/trailmix URL}
+    C --> D[Client validates URL format]
+    D -->|Invalid| E[Inline error: "Enter a valid Trailhead URL"]
+    E --> B
+    D -->|Valid| F[POST /api/trailmix/import]
+    F --> G[URL input shows spinner + "Importing..."]
+    G --> H{API response}
+    H -->|Error| I[Toast: "Import failed — check URL"]
+    I --> B
+    H -->|Success| J[Modules populate pipeline list]
+    J --> K[Stats cards animate from 0 to initial counts]
+    K --> L[All modules show 'queued' badge]
+    L --> M[First modules flip to 'scraping']
+    M --> N[Real-time status updates via polling/SSE]
+    N --> O{Module reaches quiz-ready?}
+    O -->|No| N
+    O -->|Yes — first one| P[Review panel slides in from right]
+    P --> Q[Panel header: "Review Queue (1)"]
+    Q --> R[First question displayed with AI answer + confidence]
+    R --> S{User action}
+    S -->|Approve| T[Next question loads]
+    S -->|Edit| U[Answer becomes editable textarea]
+    U --> V[User modifies → clicks Save]
+    V --> T
+    T --> W{More questions?}
+    W -->|Yes| R
+    W -->|No| X[Module status → 'completed']
+    X --> Y[Stats update: completed count +1]
+    Y --> Z{More quiz-ready modules?}
+    Z -->|Yes| R
+    Z -->|No — pipeline still running| AA[Review panel collapses]
+    AA --> N
+    Z -->|No — all done| AB[All modules completed state]
+    AB --> AC[Stats show final numbers — clean "done" state]
+```
+
+**Key interaction details within Direction 7 layout:**
+- **Center column** shows pipeline list with live status transitions (queued → scraping → processing → quiz-ready → completed)
+- **Right panel** appears only when quiz-ready modules exist — no empty panel wasting space
+- **Stat cards** at top always reflect current totals (real-time)
+- **URL input** stays in center column toolbar — user can add another trail mid-run
+
+### Journey 2: Error Recovery & Low Confidence
+
+**Entry point:** User is watching an active pipeline run.
+
+```mermaid
+flowchart TD
+    A[Pipeline running — modules processing] --> B{Error type?}
+    B -->|Session expired| C[Module status → 'error']
+    C --> D[Error badge shows on module row]
+    D --> E[Toast: "Session expired — re-authenticate"]
+    E --> F[Module row shows "Retry" action]
+    F --> G{User clicks Retry?}
+    G -->|Yes| H[Re-auth flow / session refresh]
+    H --> I[Failed modules auto-retry via pg-boss]
+    I --> J[Status returns to 'scraping']
+    G -->|Ignores| K[Error modules stay visible, pipeline continues with others]
+
+    B -->|Low confidence quiz| L[Module reaches quiz-ready with warning]
+    L --> M[Review panel shows question]
+    M --> N[Confidence bar amber/red instead of green]
+    N --> O[Label: "Low confidence — review carefully"]
+    O --> P{User reviews answer}
+    P -->|Approve anyway| Q[Proceed to next question]
+    P -->|Edit answer| R[User corrects answer in textarea]
+    R --> Q
+    P -->|Skip module| S[Module stays quiz-ready, moves down queue]
+
+    B -->|Scraping timeout| T[Module status → 'error' with retry count]
+    T --> U[Module row: "Failed (attempt 3/3)"]
+    U --> V[User can adjust settings or manually retry]
+```
+
+**Key interaction details:**
+- **Error states** are visible inline on module rows in center column — not hidden behind a separate page
+- **Low confidence** shown via amber/red confidence bars in review panel — user decides to trust or edit
+- **Retry actions** available directly on module rows — no navigation required
+- **Pipeline continues** around errors — other modules keep processing
+
+### Journey 3: Operations & Monitoring
+
+**Entry point:** User returns to dashboard during multi-day run.
+
+```mermaid
+flowchart TD
+    A[User opens Dashboard] --> B[Stats cards show current state]
+    B --> C[Pipeline list shows all module statuses]
+    C --> D{What does user check?}
+
+    D -->|Overall progress| E[Stats: 47/89 completed, 94% accuracy, 62h saved]
+    D -->|Failed modules| F[Filter chip: "Error" selected]
+    F --> G[Only error modules shown in list]
+    G --> H[Each shows error reason + retry count]
+    H --> I{User action}
+    I -->|Retry individual| J[Click retry on module row]
+    I -->|Retry all failed| K[Bulk action button in toolbar]
+
+    D -->|Review queue| L[Review panel shows pending count]
+    L --> M[User works through quiz questions]
+
+    D -->|Pipeline health| N[Settings page: system status]
+    N --> O[Worker status, queue depth, rate limits]
+    O --> P{Issue detected?}
+    P -->|Rate limited| Q[Pause scraper toggle in settings]
+    Q --> R[Wait for embeddings to catch up]
+    R --> S[Resume at lower concurrency]
+    P -->|All good| T[Return to dashboard]
+```
+
+**Key interaction details:**
+- **Filter chips** in center column toolbar let user slice by status (All, Review, Active, Error, Done)
+- **Settings page** accessible from sidebar — system health, concurrency controls
+- **Bulk actions** available when filtering error modules
+- **Review panel** persists across page loads — pending reviews don't get lost
+
+### Journey 4: Knowledge Base Query (Post-Completion)
+
+**Entry point:** User navigates to Knowledge Base from sidebar.
+
+```mermaid
+flowchart TD
+    A[Click "Knowledge Base" in sidebar] --> B[Knowledge Base page loads]
+    B --> C[Search input focused — Cmd+K also works globally]
+    C --> D[User types query]
+    D --> E[Hybrid search: vector + keyword]
+    E --> F[Results list in left panel]
+    F --> G[Each result shows: chunk title, source module, relevance score]
+    G --> H{User clicks result}
+    H --> I[Detail panel shows full chunk content]
+    I --> J[Related concepts linked at bottom]
+    J --> K{User clicks related concept?}
+    K -->|Yes| L[Navigate to that knowledge entry]
+    L --> J
+    K -->|No| M[User copies content or continues searching]
+```
+
+**Key interaction details:**
+- **Knowledge Base** uses a split-panel layout — search results left, detail right
+- **Cmd+K** omnibar works from any page — searches both modules and knowledge
+- **Concept relationships** surface cross-module connections (e.g., Apex triggers ↔ SObject events)
+
+### Journey Patterns
+
+**Navigation patterns:**
+- **Sidebar persistence:** Active page highlighted, badge counts on Knowledge Base and Review items when pending items exist
+- **Cmd+K omnibar:** Global search across modules, knowledge entries, and quiz questions. Available from any page. Opens centered modal, returns focus on close.
+- **Filter chips:** Consistent pattern across pipeline view and knowledge base for slicing data by category/status
+
+**Decision patterns:**
+- **Binary actions:** Approve / Edit for quiz answers — no ambiguity, no "maybe later"
+- **Progressive disclosure:** Module row shows status + badge → click to expand → review panel shows full detail
+- **Inline errors:** Error states shown on the module row itself, not in a separate error log page
+
+**Feedback patterns:**
+- **Real-time status badges:** Color-coded badges with monospace labels transition automatically as pipeline stages change
+- **Progress bars:** Per-module thin progress bars show scraping/processing progress
+- **Stat card animation:** Numbers animate on change (count up/down) to draw attention to updates
+- **Toast notifications:** Ephemeral, non-blocking toasts for errors and completions — auto-dismiss after 5 seconds
+- **Review panel entrance:** Slides in from right (200ms) on first quiz-ready module — draws attention without interrupting
+
+### Flow Optimization Principles
+
+**Minimize steps to value:**
+- Trail submission is 1 action: paste URL → pipeline starts. No configuration required (sensible defaults).
+- Quiz review is 1 click per question: Approve (or Edit → Save). No "confirm submission" step.
+- Knowledge search is instant: type → results appear (debounced 300ms).
+
+**Reduce cognitive load:**
+- Only one quiz question visible at a time in the review panel — sequential, not all-at-once
+- Pipeline list auto-sorts: quiz-ready at top, then active, then queued, then completed (faded)
+- Confidence score is a single visual bar + percentage — no multi-factor scoring to interpret
+
+**Error recovery is always in-context:**
+- Failed modules show retry buttons inline — no separate error management page
+- Session expiry shows a clear toast with action — not a cryptic error code
+- Low-confidence answers are flagged visually but not blocked — user decides the threshold
+
+**Moments of quiet accomplishment:**
+- Completed modules fade slightly and sort to the bottom — work moves "out of the way"
+- Stats update in real-time as modules complete — the numbers tell the story
+- No confetti, no celebration modals — just the satisfaction of watching numbers climb
