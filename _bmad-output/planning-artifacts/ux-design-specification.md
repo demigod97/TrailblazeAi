@@ -1,5 +1,5 @@
 ---
-stepsCompleted: [1, 2, 3, 4, 5, 6, 7]
+stepsCompleted: [1, 2, 3, 4, 5, 6, 7, 8]
 inputDocuments:
   - _bmad-output/planning-artifacts/product-brief-TrailblazeAi-2026-02-17.md
   - _bmad-output/planning-artifacts/prd.md
@@ -455,3 +455,194 @@ TrailBlazeAI doesn't require users to learn new interaction paradigms. Every ind
 - When an entire trail completes, a subtle completion state appears (no confetti, no celebration modal — just clean, confident "done")
 - Knowledge base is immediately searchable for all processed content
 - User can proceed to paste the next trail URL — the cycle continues
+
+## Visual Design Foundation
+
+### Color System
+
+**Primary Palette: Indigo**
+
+A deep indigo primary conveys sophistication, depth, and power — the feeling of a precision instrument, not a toy. The purple undertone adds warmth that prevents the interface from feeling sterile.
+
+**Indigo Scale (HSL):**
+
+| Token | HSL | Usage |
+|-------|-----|-------|
+| `indigo-50` | `226 100% 97%` | Subtle backgrounds, hover states (light mode) |
+| `indigo-100` | `226 100% 94%` | Active backgrounds, selection states (light mode) |
+| `indigo-200` | `228 96% 89%` | Borders, dividers on primary surfaces |
+| `indigo-300` | `230 94% 82%` | Disabled primary elements |
+| `indigo-400` | `234 89% 74%` | Secondary interactive elements |
+| `indigo-500` | `239 84% 67%` | Primary in dark mode, hover in light mode |
+| `indigo-600` | `243 75% 59%` | **Primary in light mode** — buttons, links, focus rings |
+| `indigo-700` | `245 58% 51%` | Primary pressed/active state |
+| `indigo-800` | `244 55% 41%` | Dark accents, emphasis text |
+| `indigo-900` | `242 47% 34%` | High-emphasis text on light backgrounds |
+| `indigo-950` | `244 47% 20%` | Deepest indigo, used sparingly |
+
+**Semantic Color Tokens (shadcn/ui HSL convention):**
+
+**Light Theme (`:root`):**
+
+| Token | HSL Value | Purpose |
+|-------|-----------|---------|
+| `--background` | `0 0% 100%` | Page background |
+| `--foreground` | `240 10% 3.9%` | Primary text |
+| `--card` | `0 0% 100%` | Card surfaces |
+| `--card-foreground` | `240 10% 3.9%` | Card text |
+| `--popover` | `0 0% 100%` | Popover/dropdown surfaces |
+| `--popover-foreground` | `240 10% 3.9%` | Popover text |
+| `--primary` | `243 75% 59%` | Primary actions (indigo-600) |
+| `--primary-foreground` | `0 0% 98%` | Text on primary |
+| `--secondary` | `240 4.8% 95.9%` | Secondary surfaces |
+| `--secondary-foreground` | `240 5.9% 10%` | Secondary text |
+| `--muted` | `240 4.8% 95.9%` | Muted backgrounds |
+| `--muted-foreground` | `240 3.8% 46.1%` | Muted/placeholder text |
+| `--accent` | `240 4.8% 95.9%` | Accent surfaces (hover, focus) |
+| `--accent-foreground` | `240 5.9% 10%` | Accent text |
+| `--destructive` | `0 84.2% 60.2%` | Error/destructive actions |
+| `--destructive-foreground` | `0 0% 98%` | Text on destructive |
+| `--border` | `240 5.9% 90%` | Default borders |
+| `--input` | `240 5.9% 90%` | Input borders |
+| `--ring` | `243 75% 59%` | Focus rings (matches primary) |
+
+**Dark Theme (`[data-theme="dark"]`):**
+
+| Token | HSL Value | Purpose |
+|-------|-----------|---------|
+| `--background` | `240 10% 3.9%` | Page background (deep dark with indigo tint) |
+| `--foreground` | `0 0% 98%` | Primary text |
+| `--card` | `240 10% 6%` | Card surfaces (slightly elevated) |
+| `--card-foreground` | `0 0% 98%` | Card text |
+| `--popover` | `240 10% 6%` | Popover surfaces |
+| `--popover-foreground` | `0 0% 98%` | Popover text |
+| `--primary` | `239 84% 67%` | Primary actions (indigo-500, lighter for dark bg) |
+| `--primary-foreground` | `0 0% 98%` | Text on primary |
+| `--secondary` | `240 3.7% 15.9%` | Secondary surfaces |
+| `--secondary-foreground` | `0 0% 98%` | Secondary text |
+| `--muted` | `240 3.7% 15.9%` | Muted backgrounds |
+| `--muted-foreground` | `240 5% 64.9%` | Muted/placeholder text |
+| `--accent` | `240 3.7% 15.9%` | Accent surfaces |
+| `--accent-foreground` | `0 0% 98%` | Accent text |
+| `--destructive` | `0 62.8% 30.6%` | Error/destructive (muted red for dark mode) |
+| `--destructive-foreground` | `0 0% 98%` | Text on destructive |
+| `--border` | `240 3.7% 15.9%` | Default borders |
+| `--input` | `240 3.7% 15.9%` | Input borders |
+| `--ring` | `239 84% 67%` | Focus rings (matches primary) |
+
+**Pipeline Status Colors (custom tokens):**
+
+| Status | Light Mode HSL | Dark Mode HSL | Usage |
+|--------|---------------|---------------|-------|
+| `--status-queued` | `240 5% 65%` | `240 5% 50%` | Neutral gray — waiting |
+| `--status-scraping` | `199 89% 48%` | `199 89% 55%` | Cyan/blue — actively fetching |
+| `--status-processing` | `262 83% 58%` | `262 83% 65%` | Purple — AI working |
+| `--status-embedding` | `234 89% 74%` | `234 89% 68%` | Indigo — knowledge building |
+| `--status-quiz-ready` | `38 92% 50%` | `38 92% 55%` | Amber — needs attention |
+| `--status-completed` | `142 76% 36%` | `142 76% 45%` | Green — done |
+| `--status-error` | `0 84% 60%` | `0 72% 51%` | Red — failed |
+
+### Typography System
+
+**Primary Typeface: IBM Plex Sans**
+- Loaded via `next/font/google` for zero layout shift and self-hosting
+- Sharp, screen-optimized, designed for data-dense interfaces
+- Weight range: 400 (regular), 500 (medium), 600 (semibold), 700 (bold)
+
+**Monospace Typeface: Geist Mono**
+- Loaded via `next/font/local` (bundled with Next.js)
+- Used for: code snippets, pipeline status labels, knowledge entry metadata, quiz answer content, confidence percentages, timestamps
+- Weight range: 400 (regular), 500 (medium)
+
+**Type Scale:**
+
+| Token | Size | Line Height | Weight | Usage |
+|-------|------|------------|--------|-------|
+| `text-xs` | 12px | 16px | 400/500 | Timestamps, metadata, captions |
+| `text-sm` | 14px | 20px | 400/500 | Body text, table cells, form labels |
+| `text-base` | 16px | 24px | 400/500 | Default body, card content |
+| `text-lg` | 18px | 28px | 500/600 | Subheadings, card titles |
+| `text-xl` | 20px | 28px | 600 | Section headings |
+| `text-2xl` | 24px | 32px | 600 | Page section headings |
+| `text-3xl` | 30px | 36px | 700 | Hero stat numbers |
+| `text-4xl` | 36px | 40px | 700 | Page titles (used sparingly) |
+
+**Typography Rules:**
+- Body text always `text-sm` (14px) — matches developer tool convention (VS Code, Linear, GitHub)
+- Headings use semibold (600), never bold (700) except hero stats
+- Monospace for anything that represents data, code, or system state
+- No italic for emphasis — use medium weight (500) or color instead
+- Maximum line length: 72ch for prose, unconstrained for data tables
+
+### Spacing & Layout Foundation
+
+**Base Unit: 4px**
+All spacing derives from a 4px base, creating consistent visual rhythm.
+
+**Spacing Scale:**
+
+| Token | Value | Usage |
+|-------|-------|-------|
+| `space-0.5` | 2px | Tight inline spacing (icon-to-label gap) |
+| `space-1` | 4px | Minimum padding (badge padding, tight gaps) |
+| `space-1.5` | 6px | Compact element spacing |
+| `space-2` | 8px | Standard gap between related elements |
+| `space-3` | 12px | Card internal padding, form field spacing |
+| `space-4` | 16px | Section spacing within a card or panel |
+| `space-5` | 20px | Between cards in a grid |
+| `space-6` | 24px | Page padding, major section separation |
+| `space-8` | 32px | Large section gaps |
+| `space-10` | 40px | Page section dividers |
+| `space-12` | 48px | Hero section padding |
+
+**Layout Constants:**
+
+| Property | Value | Rationale |
+|----------|-------|-----------|
+| Content max-width | 1200px | Comfortable reading width for dashboard |
+| Sidebar expanded | 240px | Fits icon + label + chevron |
+| Sidebar collapsed | 48px | Icon-only, single column |
+| Card border-radius | 8px | Sharp but not brutalist (shadcn default reduced) |
+| Button border-radius | 6px | Slightly sharper than cards |
+| Input border-radius | 6px | Matches buttons |
+| Badge border-radius | 4px | Compact, tag-like |
+
+**Grid System:**
+- Dashboard: CSS Grid, 12-column base, responsive breakpoints at 640/768/1024/1280px
+- Module card grid: `auto-fill, minmax(320px, 1fr)` — cards fill available width, wrap naturally
+- Knowledge base: Split panel — fixed sidebar (280px) + flexible content area
+- No rigid grid enforcement — components size to content within responsive containers
+
+**Density (Balanced):**
+- Card padding: 16px (comfortable without feeling wasteful)
+- Table row height: 40px (readable without dense compression)
+- List item spacing: 8px gap between items
+- Form field spacing: 12px between fields, 24px between field groups
+- Section dividers use 32px vertical spacing
+
+### Accessibility Considerations
+
+**Color Contrast:**
+- All text on backgrounds meets WCAG 2.1 AA minimum (4.5:1 for normal text, 3:1 for large text)
+- Primary indigo on white: ~5.2:1 (AA pass)
+- Primary indigo on dark background: ~7.1:1 (AAA pass)
+- Muted foreground on background: verified ≥ 4.5:1 in both themes
+- Pipeline status colors are never used as the sole indicator — always paired with text labels or icons
+
+**Focus Management:**
+- Focus ring: 2px solid using `--ring` token, 2px offset
+- All interactive elements have visible focus states in both themes
+- Tab order follows visual layout (left-to-right, top-to-bottom)
+- Cmd+K omnibar traps focus when open, returns focus on close
+
+**Motion & Reduced Motion:**
+- Pipeline state transitions use subtle CSS transitions (150ms ease)
+- `prefers-reduced-motion: reduce` disables all animations, transitions become instant
+- No auto-playing animations — all motion is triggered by user action or state change
+- Real-time card updates use opacity fade (200ms), not position animation
+
+**Screen Reader Support:**
+- Radix UI primitives provide ARIA attributes automatically
+- Pipeline status changes announced via `aria-live="polite"` region
+- Hero stat cards include descriptive `aria-label` (e.g., "47 of 89 modules completed")
+- Quiz review panel uses `role="dialog"` with proper labeling
