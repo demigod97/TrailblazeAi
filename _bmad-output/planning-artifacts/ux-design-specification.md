@@ -1,5 +1,5 @@
 ---
-stepsCompleted: [1, 2, 3, 4, 5, 6]
+stepsCompleted: [1, 2, 3, 4, 5, 6, 7]
 inputDocuments:
   - _bmad-output/planning-artifacts/product-brief-TrailblazeAi-2026-02-17.md
   - _bmad-output/planning-artifacts/prd.md
@@ -338,3 +338,120 @@ This is a copy-paste component library, not a dependency. Components live in `ap
 - Content max-width: 1200px for dashboard, full-width for knowledge explorer
 - Sidebar width: 240px expanded, 48px collapsed (icon-only)
 - Consistent 8px grid alignment for all component placement
+
+## 2. Core User Experience
+
+### 2.1 Defining Experience
+
+**"Paste a URL. Watch it learn. Review the answers."**
+
+TrailBlazeAI's defining experience is a three-act arc that plays out every time a user processes a trail:
+
+**Act 1 — The Launch.** A single input field. Paste a Trailhead trail URL. Press Enter. That's it. One action triggers the processing of dozens of modules, hundreds of knowledge entries, and every quiz in the trail. The power is in the contrast: one keystroke starts hours of automated work.
+
+**Act 2 — The Pipeline.** The dashboard transforms into a live operations view. Module cards flow through pipeline states — `scraping → processing → embedding → quiz-ready → completed`. Progress is visible, glanceable, and updating in real-time via Supabase Realtime. The user doesn't need to watch, but watching feels *good*. It's the deployment log of knowledge.
+
+**Act 3 — The Knowledge.** The AI didn't just answer quizzes — it *understood* the material. The knowledge base is searchable, connected, and navigable. Concepts link to concepts. Salesforce domains emerge as clusters in the concept graph. The user discovers that the AI organized their learning better than they would have themselves.
+
+The three acts are inseparable. The launch is the promise. The pipeline is the proof. The knowledge is the payoff.
+
+### 2.2 User Mental Model
+
+**Primary mental model: "Automation with a review gate."**
+
+The user thinks of TrailBlazeAI as a capable assistant that does the tedious work (reading content, extracting knowledge, drafting quiz answers) but respects the user's authority on the final step (submitting answers).
+
+**How they think about it:**
+- "I paste the URL and it handles everything up to the quiz."
+- "I review the answers it generated and approve or adjust before submission."
+- "I can check in whenever I want — it keeps working whether I'm watching or not."
+- "The knowledge base is a bonus — I can actually learn from what it processed."
+
+**Current solution (manual Trailhead):**
+- Reading every module page (tedious, slow)
+- Manually answering quizzes (time-consuming, error-prone under fatigue)
+- No knowledge retention system (read once, forget immediately)
+- No way to track overall progress across trails
+
+**What they love about manual approach:** Actually understanding concepts when they pay attention.
+**What they hate:** The sheer volume. 100+ hours of content that's often repetitive or obvious for experienced developers.
+
+**Key insight:** The review gate is what separates TrailBlazeAI from a "cheat tool." The user stays in the loop on quiz submission, which means they maintain awareness of the material and can catch AI mistakes. This is the trust architecture.
+
+### 2.3 Success Criteria
+
+**The core experience succeeds when the user feels:**
+- "This just works" — Paste a URL, walk away, come back to progress.
+- "I'm still in control" — Quiz answers wait for my review before submission.
+- "It's smarter than I expected" — Knowledge connections I didn't anticipate.
+
+**Success Indicators:**
+
+| Indicator | Measurement |
+|-----------|------------|
+| **Time-to-first-progress** | < 5 seconds from URL paste to first module appearing in pipeline |
+| **Zero-config launch** | No settings, options, or dialogs between paste and processing start |
+| **Review confidence** | User can assess a quiz answer's correctness in < 10 seconds per question |
+| **Pipeline transparency** | User always knows: what's running, what's queued, what's done, what failed |
+| **Knowledge surprise** | User discovers a concept connection they didn't know about at least once per trail |
+| **Recovery without anxiety** | If something fails, the user knows exactly what failed and can retry with one click |
+
+### 2.4 Novel vs. Established UX Patterns
+
+**Pattern classification: Established patterns, novel combination.**
+
+TrailBlazeAI doesn't require users to learn new interaction paradigms. Every individual pattern is familiar:
+- Pasting a URL (established — every web tool does this)
+- Pipeline visualization (established — CI/CD dashboards, Vercel deployments)
+- Search and browse (established — any knowledge base or documentation site)
+- Review and approve (established — PR review, content moderation)
+
+**The novelty is in the combination and context:** No existing tool combines Trailhead content extraction + AI knowledge synthesis + quiz answer generation + human review gate in a single dashboard. The patterns are familiar but the workflow is new.
+
+**Familiar metaphors we leverage:**
+- **CI/CD pipeline** → Module processing pipeline (developers already understand stages, states, and logs)
+- **PR review** → Quiz answer review (developers already understand "review before merge/submit")
+- **Documentation search** → Knowledge base search (developers already understand full-text search with previews)
+- **Deployment dashboard** → Progress dashboard (developers already understand hero stats + activity feeds)
+
+**No user education required.** A developer who has used Vercel, GitHub Actions, and VS Code will immediately understand every surface in TrailBlazeAI. The onboarding is: paste a URL.
+
+### 2.5 Experience Mechanics
+
+**Core Flow: "Paste → Process → Review → Complete"**
+
+**1. Initiation:**
+- User navigates to dashboard (the default and only entry point)
+- A prominent, centered input field with placeholder: `Paste a Trailhead trail or module URL...`
+- User pastes URL, presses Enter (or clicks a single "Start" button)
+- No configuration dialogs, no options, no "are you sure?" — it just starts
+- The input field can also accept multiple URLs (one per line) for batch processing
+- Cmd+K omnibar also accepts URLs as a secondary entry point
+
+**2. Interaction (Pipeline Phase):**
+- Dashboard immediately shows the trail with its modules as cards in `queued` state
+- Modules begin processing sequentially (or in configured parallel batches)
+- Each card transitions through pipeline states with visual indicators: `queued → scraping → processing → embedding → quiz-ready`
+- Cards that reach `quiz-ready` state are visually distinct — highlighted border, review badge
+- Pipeline activity log shows timestamped entries for each state transition (collapsed by default, expandable)
+- User can continue to paste new URLs while processing is active — new trails queue up
+- Real-time updates via Supabase Realtime — no polling, no refresh needed
+
+**3. Feedback (Review Phase):**
+- When a module reaches `quiz-ready`, it surfaces in a "Ready for Review" section
+- Clicking a quiz-ready module opens the quiz review panel:
+  - Question text displayed clearly
+  - AI-generated answer highlighted with confidence indicator
+  - Supporting knowledge context shown (which extracted content informed the answer)
+  - One-click approve (submit as-is) or inline edit (adjust before submit)
+- Batch approve option: "Approve all high-confidence answers" for experienced users who trust the AI
+- After approval, module automatically transitions to `submitting → completed`
+- If the AI got an answer wrong and the user corrects it, the correction feeds back into the knowledge base
+
+**4. Completion:**
+- Completed modules show a green checkmark and earned badge (if applicable)
+- Hero stat cards update in real-time: modules completed, badges earned, accuracy rate, estimated time saved
+- Trail-level progress bar fills as modules complete
+- When an entire trail completes, a subtle completion state appears (no confetti, no celebration modal — just clean, confident "done")
+- Knowledge base is immediately searchable for all processed content
+- User can proceed to paste the next trail URL — the cycle continues
