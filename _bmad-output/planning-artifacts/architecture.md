@@ -1,5 +1,5 @@
 ---
-stepsCompleted: [1, 2, 3, 4, 5]
+stepsCompleted: [1, 2, 3, 4, 5, 6]
 inputDocuments:
   - _bmad-output/planning-artifacts/prd.md
   - _bmad-output/planning-artifacts/product-brief-TrailblazeAi-2026-02-17.md
@@ -832,3 +832,394 @@ class PipelineError extends AppError {
 | `throw new Error('not found')` | `throw new NotFoundError('module', id)` |
 | `camelCase` in API JSON responses | `snake_case` matching DB columns |
 | Global Redux/Zustand store | Supabase as source of truth |
+
+## Project Structure & Boundaries
+
+### Complete Project Directory Structure
+
+```
+trailblaze-ai/
+├── .env.example                          # Environment variable template
+├── .gitignore
+├── .github/
+│   └── workflows/
+│       └── ci.yml                        # GitHub Actions: type-check + test + build
+├── package.json                          # Root workspace config (pnpm)
+├── pnpm-workspace.yaml                   # Workspace: apps/*, packages/*
+├── turbo.json                            # Turborepo task orchestration
+├── tsconfig.json                         # Root TypeScript config (strict, ESM)
+├── .prettierrc                           # Prettier config (defaults)
+│
+├── apps/
+│   ├── web/                              # @trailblaze/web — Next.js 15 (Vercel)
+│   │   ├── package.json
+│   │   ├── next.config.ts                # Transpiles workspace packages
+│   │   ├── tsconfig.json
+│   │   ├── postcss.config.mjs            # Tailwind CSS v4
+│   │   ├── components.json               # shadcn/ui config (new-york)
+│   │   ├── middleware.ts                  # Supabase session refresh (getClaims)
+│   │   ├── app/
+│   │   │   ├── globals.css               # Tailwind v4 @import + @theme
+│   │   │   ├── layout.tsx                # Root layout (Supabase provider, fonts)
+│   │   │   ├── page.tsx                  # Landing → redirect to /dashboard
+│   │   │   ├── login/
+│   │   │   │   └── page.tsx              # Email/password login (Supabase Auth)
+│   │   │   ├── dashboard/
+│   │   │   │   ├── layout.tsx            # Three-column shell (sidebar, center, review)
+│   │   │   │   ├── page.tsx              # Pipeline view (module list + status)
+│   │   │   │   └── loading.tsx           # Skeleton fallback
+│   │   │   ├── knowledge/
+│   │   │   │   ├── page.tsx              # Knowledge base search + browse
+│   │   │   │   └── loading.tsx
+│   │   │   └── settings/
+│   │   │       ├── page.tsx              # Pipeline config, system health, session
+│   │   │       └── loading.tsx
+│   │   └── src/
+│   │       ├── components/
+│   │       │   ├── ui/                   # shadcn/ui primitives (button, card, etc.)
+│   │       │   ├── dashboard/
+│   │       │   │   ├── index.ts          # Barrel export
+│   │       │   │   ├── module-row.tsx    # Module status row in pipeline list
+│   │       │   │   ├── pipeline-toolbar.tsx  # URL input + filter chips
+│   │       │   │   ├── progress-summary.tsx  # Aggregated stats bar
+│   │       │   │   └── stage-badge.tsx   # Pipeline stage indicator
+│   │       │   ├── quiz-review/
+│   │       │   │   ├── index.ts
+│   │       │   │   ├── review-panel.tsx  # Right column: quiz answer review
+│   │       │   │   ├── answer-card.tsx   # Individual answer with confidence
+│   │       │   │   ├── reasoning-view.tsx # Chain-of-thought reasoning display
+│   │       │   │   └── confidence-bar.tsx
+│   │       │   ├── knowledge/
+│   │       │   │   ├── index.ts
+│   │       │   │   ├── search-input.tsx  # Hybrid search interface
+│   │       │   │   ├── chunk-card.tsx    # Knowledge chunk display
+│   │       │   │   └── chunk-detail.tsx  # Full chunk + metadata view
+│   │       │   ├── activity/
+│   │       │   │   ├── index.ts
+│   │       │   │   └── agent-log-feed.tsx # Live agent action stream
+│   │       │   └── layout/
+│   │       │       ├── index.ts
+│   │       │       ├── sidebar.tsx       # Navigation sidebar
+│   │       │       ├── command-menu.tsx   # Cmd+K omnibar
+│   │       │       └── three-column-shell.tsx # Responsive layout container
+│   │       ├── lib/
+│   │       │   ├── utils.ts              # cn() — clsx + tailwind-merge
+│   │       │   ├── supabase/
+│   │       │   │   ├── client.ts         # createBrowserClient (anon key)
+│   │       │   │   └── server.ts         # createServerClient (cookie handling)
+│   │       │   └── hooks/
+│   │       │       ├── use-module-status.ts  # Realtime Pattern A (router.refresh)
+│   │       │       ├── use-agent-logs.ts     # Realtime Pattern B (useState)
+│   │       │       └── use-quiz-results.ts   # Realtime Pattern A
+│   │       └── types/
+│   │           └── database.ts           # Placeholder → supabase gen types
+│   │
+│   └── api/                              # @trailblaze/api — Fastify 5 (Docker/VPS)
+│       ├── package.json
+│       ├── tsconfig.json
+│       ├── src/
+│       │   ├── index.ts                  # Fastify app bootstrap + plugin registration
+│       │   ├── config.ts                 # Zod-validated env vars
+│       │   ├── app.ts                    # Fastify instance factory (testable)
+│       │   ├── plugins/
+│       │   │   ├── auth.ts               # @fastify/bearer-auth setup
+│       │   │   ├── cors.ts               # @fastify/cors config
+│       │   │   ├── rate-limit.ts         # @fastify/rate-limit config
+│       │   │   ├── pg-boss.ts            # pg-boss initialization + queue creation
+│       │   │   └── error-handler.ts      # Global AppError → ApiResponse mapper
+│       │   ├── routes/
+│       │   │   ├── health.ts             # GET /health
+│       │   │   ├── modules.ts            # GET/POST /api/modules, GET /api/modules/:id
+│       │   │   ├── runs.ts              # POST /api/runs, GET /api/runs/:id
+│       │   │   ├── quiz-results.ts       # GET /api/quiz-results
+│       │   │   ├── knowledge.ts          # GET /api/knowledge/search
+│       │   │   └── progress.ts           # GET /api/progress
+│       │   ├── agents/
+│       │   │   ├── scraper-agent.ts      # Playwright MCP browser automation
+│       │   │   ├── knowledge-agent.ts    # Content → chunks → embeddings
+│       │   │   ├── quiz-agent.ts         # Hybrid search → reasoning → answer
+│       │   │   └── documentation-agent.ts # Supplemental knowledge enrichment
+│       │   ├── pipeline/
+│       │   │   ├── stages/
+│       │   │   │   ├── scrape-unit.ts         # Stage 1: Extract raw HTML
+│       │   │   │   ├── extract-content.ts     # Stage 2: Parse HTML → structured sections
+│       │   │   │   ├── identify-concepts.ts   # Stage 3: LLM concept extraction
+│       │   │   │   ├── chunk-content.ts       # Stage 4: ChonkieJS + Trailhead rules
+│       │   │   │   ├── generate-embeddings.ts # Stage 5: AI SDK embedMany()
+│       │   │   │   └── build-relationships.ts # Stage 6: Concept dependency mapping
+│       │   │   ├── queue-handlers.ts     # pg-boss work() registrations + chaining
+│       │   │   └── concurrency.ts        # Per-queue concurrency limits
+│       │   ├── prompts/
+│       │   │   ├── scraper-agent.yaml    # Playwright navigation prompts
+│       │   │   ├── knowledge-agent.yaml  # Concept extraction prompts
+│       │   │   ├── quiz-agent.yaml       # Chain-of-thought reasoning prompts
+│       │   │   └── documentation-agent.yaml
+│       │   ├── lib/
+│       │   │   ├── errors.ts             # AppError, NotFoundError, ValidationError, PipelineError
+│       │   │   ├── mcp-client.ts         # Playwright MCP client factory (stdio transport)
+│       │   │   ├── stagehand-fallback.ts # Stagehand v3 for Shadow DOM failures
+│       │   │   ├── cost-tracker.ts       # Token counting + cost estimation per model
+│       │   │   └── response.ts           # ApiSuccess / ApiError envelope helpers
+│       │   └── types/
+│       │       └── api.ts                # ApiResponse<T>, route-specific request/response types
+│       └── vitest.config.ts              # Vitest config for API tests
+│
+├── packages/
+│   ├── db/                               # @trailblaze/db — Supabase client + types
+│   │   ├── package.json
+│   │   ├── tsconfig.json
+│   │   ├── src/
+│   │   │   ├── index.ts                  # Re-exports client + types
+│   │   │   ├── client.ts                 # createClient(url, key) factory
+│   │   │   └── types.ts                  # Placeholder → supabase gen types
+│   │   └── supabase/
+│   │       ├── config.toml               # Supabase project config
+│   │       └── migrations/
+│   │           ├── 001_core_tables.sql        # modules, units, runs
+│   │           ├── 002_knowledge_tables.sql   # sf_knowledge_chunks, sf_concept_relationships
+│   │           ├── 003_quiz_tables.sql        # quiz_items, quiz_results
+│   │           ├── 004_observability.sql      # agent_logs (ToolTrace)
+│   │           ├── 005_indexes.sql            # HNSW vector, FTS, composite indexes
+│   │           ├── 006_rls_policies.sql       # Row-level security for all tables
+│   │           └── 007_functions.sql          # hybrid_search() RPC function
+│   │
+│   └── shared/                           # @trailblaze/shared — Domain types + constants
+│       ├── package.json
+│       ├── tsconfig.json
+│       └── src/
+│           ├── index.ts                  # Barrel export
+│           ├── constants.ts              # JOB_TYPES, MODULE_STATUS, API_ROUTES
+│           └── types/
+│               └── trailhead.ts          # Module, Unit, Quiz, KnowledgeEntry, etc.
+│
+├── docker/
+│   ├── docker-compose.yml                # api + worker + nginx services
+│   ├── api.Dockerfile                    # Multi-stage Node 22 Alpine (512MB limit)
+│   ├── worker.Dockerfile                 # Playwright image (3GB limit)
+│   ├── .dockerignore
+│   └── nginx/
+│       └── nginx.conf                    # Reverse proxy + SSL + rate limiting
+│
+├── _bmad/                                # BMAD V6 framework (agents, workflows)
+├── _bmad-output/                         # Planning artifacts + project context
+│   ├── project-context.md
+│   └── planning-artifacts/
+│       ├── architecture.md               # This document
+│       ├── prd.md
+│       ├── product-brief-*.md
+│       ├── ux-design-specification.md
+│       ├── bmm-workflow-status.yaml
+│       └── research/
+└── apps/web/e2e/                         # Playwright E2E tests
+    ├── dashboard.spec.ts
+    ├── knowledge.spec.ts
+    └── fixtures/
+```
+
+### Architectural Boundaries
+
+**API Boundaries:**
+
+| Boundary | Inbound | Outbound | Auth |
+|----------|---------|----------|------|
+| Vercel → VPS API | Next.js API routes proxy | Fastify routes respond | Bearer token |
+| Browser → Supabase | Frontend Supabase client | Supabase PostgREST/Realtime | Anon key + RLS |
+| VPS → Supabase | Fastify/Workers | Supabase service role client | Service role key (bypasses RLS) |
+| VPS → Claude API | AI SDK agents | Claude Haiku/Sonnet responses | Anthropic API key |
+| VPS → OpenAI API | AI SDK embedMany() | Embedding vectors | OpenAI API key |
+| VPS → Trailhead | Playwright MCP browser | HTML pages + quiz forms | Salesforce session cookie |
+
+**Service Boundaries (VPS):**
+
+| Service | Container | Responsibility | Communication |
+|---------|-----------|---------------|---------------|
+| API Server | `api` (512MB) | REST endpoints, pg-boss scheduler, job dispatch | Receives HTTP, writes Supabase |
+| Worker | `worker` (3GB) | Playwright browser, pipeline stages, LLM agents | Reads pg-boss jobs, writes Supabase |
+| Nginx | `nginx` (128MB) | TLS termination, reverse proxy, rate limiting | Routes external traffic to API |
+
+API and Worker share the same Supabase PostgreSQL instance (including pg-boss tables). They do NOT communicate directly — Supabase is the only shared state.
+
+**Component Boundaries (Frontend):**
+
+| Boundary | Server vs Client | Data Source |
+|----------|-----------------|-------------|
+| Dashboard layout + module list | Server Component | Supabase server client |
+| Pipeline toolbar (URL input, filters) | Client Component (`'use client'`) | Local state + URL params |
+| Review panel (quiz answers) | Client Component | Supabase + local edits |
+| Agent log feed | Client Component | Supabase Realtime (Pattern B) |
+| Knowledge search | Server Component + Client input | Supabase RPC (hybrid_search) |
+| Settings page | Server Component (initial) + Client forms | Supabase server client |
+
+**Data Boundaries:**
+
+| Layer | Access Pattern | Client |
+|-------|---------------|--------|
+| Frontend read | PostgREST via anon key, RLS enforced | `@supabase/ssr` browser/server clients |
+| Frontend write | Limited — only settings, manual answer edits | `@supabase/ssr` browser client |
+| Backend read/write | Service role key, RLS bypassed | `@supabase/supabase-js` in Fastify |
+| Realtime subscriptions | Filtered Postgres Changes (per table + filter) | Supabase Realtime channels |
+| Vector search | `hybrid_search()` RPC function | Both frontend (knowledge page) and backend (quiz agent) |
+
+### Requirements to Structure Mapping
+
+**FR Category → Directory Mapping:**
+
+| FR Category | Primary Directory | Key Files |
+|-------------|------------------|-----------|
+| Content Acquisition (FR1-FR7) | `apps/api/src/agents/scraper-agent.ts` | `mcp-client.ts`, `stagehand-fallback.ts`, `scrape-unit.ts` |
+| Knowledge Processing (FR8-FR12) | `apps/api/src/pipeline/stages/` | `extract-content.ts`, `identify-concepts.ts`, `chunk-content.ts`, `generate-embeddings.ts` |
+| Knowledge Retrieval (FR13-FR16) | `packages/db/supabase/migrations/007_functions.sql` | `hybrid_search()` RPC, `apps/api/src/routes/knowledge.ts` |
+| Quiz Automation (FR17-FR22) | `apps/api/src/agents/quiz-agent.ts` | `quiz-agent.yaml`, `apps/api/src/routes/quiz-results.ts` |
+| Pipeline Orchestration (FR23-FR28) | `apps/api/src/pipeline/` | `queue-handlers.ts`, `concurrency.ts`, `pg-boss.ts` plugin |
+| System Operations (FR29-FR34) | `apps/api/src/routes/` | `health.ts`, `progress.ts`, `apps/api/src/lib/cost-tracker.ts` |
+| Knowledge Export (FR35-FR37) | `apps/api/src/routes/knowledge.ts` | `apps/web/app/knowledge/page.tsx` |
+| Dashboard UI | `apps/web/src/components/dashboard/` | `module-row.tsx`, `pipeline-toolbar.tsx`, `progress-summary.tsx` |
+| Quiz Review UI | `apps/web/src/components/quiz-review/` | `review-panel.tsx`, `answer-card.tsx`, `reasoning-view.tsx` |
+| Knowledge Explorer UI | `apps/web/src/components/knowledge/` | `search-input.tsx`, `chunk-card.tsx`, `chunk-detail.tsx` |
+
+**Cross-Cutting Concerns → Location Mapping:**
+
+| Concern | Location(s) |
+|---------|------------|
+| Authentication (Supabase Auth) | `apps/web/middleware.ts`, `apps/web/src/lib/supabase/`, `apps/web/app/login/` |
+| API Auth (Bearer token) | `apps/api/src/plugins/auth.ts` |
+| Error handling | `apps/api/src/lib/errors.ts`, `apps/api/src/plugins/error-handler.ts` |
+| Cost tracking | `apps/api/src/lib/cost-tracker.ts`, `agent_logs` table |
+| Real-time updates | `apps/web/src/lib/hooks/use-*.ts`, Supabase Realtime config |
+| Domain types | `packages/shared/src/types/trailhead.ts` |
+| Database types | `packages/db/src/types.ts` (generated) |
+| Validation (Zod) | `apps/api/src/config.ts` (env), route handlers (request bodies) |
+| Observability | `agent_logs` table, Fastify Pino logger, `cost-tracker.ts` |
+
+### Integration Points
+
+**Internal Communication:**
+
+```
+┌─────────────┐     Bearer token      ┌─────────────┐
+│  Next.js    │ ──────────────────────→│  Fastify    │
+│  (Vercel)   │     API proxy          │  (VPS:3001) │
+└──────┬──────┘                        └──────┬──────┘
+       │                                      │
+       │ anon key                              │ service role key
+       │ + RLS                                 │ (no RLS)
+       ▼                                      ▼
+┌──────────────────────────────────────────────────┐
+│                   Supabase                        │
+│  ┌──────────┐  ┌──────────┐  ┌────────────────┐  │
+│  │ PostgREST│  │ Realtime │  │  pg-boss tables│  │
+│  │ (CRUD)   │  │ (WebSocket)│ │  (job queue)  │  │
+│  └──────────┘  └──────────┘  └────────────────┘  │
+│  ┌──────────┐  ┌──────────┐                       │
+│  │ pgvector │  │   FTS    │                       │
+│  │ (HNSW)   │  │ (GIN)   │                       │
+│  └──────────┘  └──────────┘                       │
+└──────────────────────────────────────────────────┘
+       ▲                                      │
+       │ Realtime subscriptions                │ pg-boss work()
+       │ (module-status, agent-logs,           ▼
+       │  quiz-results)              ┌─────────────┐
+       │                             │   Worker     │
+       └─────────────────────────────│   (VPS)      │
+                                     │              │
+                                     │ ┌──────────┐ │
+                                     │ │Playwright│ │
+                                     │ │  MCP     │ │
+                                     │ └────┬─────┘ │
+                                     │      │       │
+                                     │      ▼       │
+                                     │  Trailhead   │
+                                     └─────────────┘
+```
+
+**External Integrations:**
+
+| Service | Protocol | Client | Rate Limits |
+|---------|----------|--------|-------------|
+| Supabase PostgreSQL | postgres (pooled) | `@supabase/supabase-js` | Connection pool: 15 |
+| Supabase Realtime | WebSocket | Supabase client (browser) | 100 concurrent connections |
+| Claude API (Haiku/Sonnet) | HTTPS | `@ai-sdk/anthropic` | 60 RPM (Haiku), 40 RPM (Sonnet) |
+| OpenAI Embeddings API | HTTPS | `@ai-sdk/openai` | 500 RPM |
+| Trailhead | HTTPS (browser) | Playwright MCP | 2 concurrent pages |
+| Stagehand (fallback) | HTTPS | `@anthropic-ai/stagehand` | Shares Claude rate limits |
+
+**Data Flow — Module Processing Pipeline:**
+
+```
+User submits Trailmix URL
+  → Fastify POST /api/runs
+    → pg-boss send('scrape-module', { module_id, priority })
+      → Worker: scrape-unit.ts (Playwright MCP → raw HTML → units table)
+        → pg-boss send('extract-content')
+          → Worker: extract-content.ts (HTML → markdown + sections → units table)
+            → pg-boss send('identify-concepts')
+              → Worker: identify-concepts.ts (Claude Haiku → concepts → sf_knowledge_chunks metadata)
+                → pg-boss send('chunk-content')
+                  → Worker: chunk-content.ts (ChonkieJS → chunks → sf_knowledge_chunks)
+                    → pg-boss send('generate-embeddings')
+                      → Worker: generate-embeddings.ts (OpenAI → vectors → sf_knowledge_chunks.embedding)
+                        → pg-boss send('build-relationships')
+                          → Worker: build-relationships.ts (Claude Haiku → sf_concept_relationships)
+                            → Module status → 'ready'
+                              → pg-boss send('answer-quiz', { priority: 1 })
+                                → Worker: quiz-agent.ts (hybrid_search → Claude Sonnet → quiz_results)
+                                  → Module status → 'completed'
+```
+
+Each stage writes progress to `modules.status` → Supabase Realtime notifies frontend.
+
+### Development Workflow Integration
+
+**Development Servers:**
+```bash
+pnpm dev                              # Turbo: starts all dev servers
+pnpm --filter @trailblaze/web dev     # Next.js on :3000 (hot reload)
+pnpm --filter @trailblaze/api dev     # Fastify on :3001 (tsx watch)
+```
+
+**Build Process:**
+```bash
+pnpm build                            # Turbo: build all (packages first → apps)
+# packages/shared → dist/ (tsup)
+# packages/db → dist/ (tsup)
+# apps/api → dist/ (tsup, ESM)
+# apps/web → .next/ (Next.js)
+```
+
+**Type Checking:**
+```bash
+pnpm type-check                       # Turbo: tsc --noEmit across all packages
+```
+
+**Testing:**
+```bash
+pnpm test                             # Vitest: unit + integration across all packages
+pnpm test:e2e                         # Playwright E2E (apps/web/e2e/)
+```
+
+**Database:**
+```bash
+supabase migration new <name>         # Create new migration in packages/db/supabase/migrations/
+supabase db push                      # Apply migrations to remote
+supabase gen types typescript          # Regenerate packages/db/src/types.ts
+```
+
+**Deployment:**
+```bash
+# Frontend: git push → Vercel auto-deploys (preview on PR, production on main)
+# Backend: ssh → docker compose up -d --build (VPS)
+docker compose -f docker/docker-compose.yml up -d --build
+```
+
+**Package Dependencies (workspace graph):**
+```
+@trailblaze/web ──→ @trailblaze/shared
+                ──→ @trailblaze/db
+
+@trailblaze/api ──→ @trailblaze/shared
+                ──→ @trailblaze/db
+
+@trailblaze/db  ──→ (no internal deps)
+
+@trailblaze/shared ──→ (no internal deps)
+```
