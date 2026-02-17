@@ -49,11 +49,11 @@ workflow_status:
     note: "Complete - 12-step create workflow: Executive Summary, Success Criteria, Product Scope, User Journeys, Domain Requirements, Innovation, Web App Requirements, 37 FRs, 25 NFRs, polished"
 
   create-ux-design:
-    status: "conditional"
+    status: "_bmad-output/planning-artifacts/ux-design-specification.md"
     condition: "if_has_ui"
     agent: "ux-designer"
     command: "/bmad:bmm:workflows:create-ux-design"
-    note: "Determined after PRD - user/agent decides if needed"
+    note: "Complete - 14-step workflow: Direction 7 (Quiz Review Focus), indigo palette, shadcn/ui, 9 custom components, 4 journey flows, WCAG 2.1 AA"
 
   # Phase 3: Solutioning
   create-architecture:
