@@ -1,5 +1,5 @@
 ---
-stepsCompleted: [1, 2, 3]
+stepsCompleted: [1, 2, 3, 4]
 inputDocuments:
   - _bmad-output/planning-artifacts/product-brief-TrailblazeAi-2026-02-17.md
   - _bmad-output/planning-artifacts/prd.md
@@ -125,3 +125,64 @@ The **full completion** moment is the most critical — it must feel like a genu
 4. **Celebrate progress, don't alarm on errors** — Badges earned, accuracy stats, and knowledge growth are prominent and rewarding. Errors and retries are visible but non-urgent — the system handles recovery. Reserve visual urgency for things that actually need human attention (session expiry, manual review items).
 
 5. **The knowledge outlives the run** — Every design decision for the knowledge explorer assumes it will be used daily for months. It should get better with use, not just survive it.
+
+## Desired Emotional Response
+
+### Primary Emotional Goals
+
+| Phase | Primary Emotion | Description |
+|-------|----------------|-------------|
+| **Knowledge Phase** (daily use) | **Powerful & Precise** | Like a well-tuned CLI. Fast, clean, no wasted motion. You type, you get, you go. The satisfaction comes from the tool's precision, not its decoration. |
+| **Run Phase** (2-3 days) | **Calm Confidence** | Like watching a Vercel deploy. You kicked it off, it's working, you trust it. The system earns trust by being transparent without being noisy. |
+| **Error States** | **Reassuring & Gentle** | Warm but competent. "A quiz needed manual review. I've queued it — everything else is still rolling." Not dismissive, not alarming. The system communicates that it's handling things. |
+| **Completion** | **Genuine Achievement** | Full completion should feel earned and significant. A rich summary of what was accomplished, not just a checkbox. The transition from "run tool" to "knowledge tool" should feel like leveling up. |
+
+### Emotional Journey Mapping
+
+| Stage | Emotion | Design Expression |
+|-------|---------|-------------------|
+| **First launch** | Curiosity + Anticipation | Clean, uncluttered start screen. Paste URL, hit Enter. No intimidating forms. |
+| **First badge earned** | Surprise + Validation | Subtle but visible celebration. "It works." Confidence in the tool established. |
+| **Active monitoring** | Calm engagement | Steady progress indicators, no flashing alerts. Numbers climb reliably. Activity log scrolls smoothly. |
+| **Periodic check-in** | Quick satisfaction | Glanceable stats answer "how's it going?" in 2 seconds. No need to parse or hunt. |
+| **Error encountered** | Brief concern → Reassurance | Error appears, but immediately shows resolution status. "Retrying in 30s" or "Queued for review." Concern resolves within the same glance. |
+| **Full completion** | Pride + Readiness | Rich completion summary. Knowledge base statistics. "Your Salesforce knowledge base is ready." The tool transforms from runner to reference. |
+| **Daily knowledge search** | Flow state | Cmd+K → type → result → done. Zero friction. The tool disappears; only the knowledge remains. |
+| **Knowledge export** | Empowerment | One action, clean output. "Now my AI tools know Salesforce too." |
+
+### Micro-Emotions
+
+**Critical to cultivate:**
+- **Confidence** — Every interaction confirms the system is reliable and accurate
+- **Control** — Keyboard-first means the user drives the pace, never the system
+- **Trust** — Transparency in what's happening without requiring investigation
+- **Flow** — Search-to-answer speed preserves focus and momentum
+
+**Critical to prevent:**
+- **Overwhelm** — Never show too many stats, options, or settings at once. Progressive disclosure is mandatory.
+- **Anxiety/Uncertainty** — Always show system state clearly. Never leave the user guessing if something is working, stuck, or broken.
+- **Condescension** — No tutorials, no "are you sure?" confirmations, no dumbed-down language. This is a developer tool for a developer.
+- **Impatience** — Sub-100ms search, instant navigation, no loading spinners in the critical path. If something takes time, show a skeleton or progress indicator immediately.
+
+### Design Implications
+
+| Emotional Goal | UX Design Approach |
+|---------------|-------------------|
+| **Powerful & Precise** | Monospace accents in data-heavy areas. Sharp, high-contrast status indicators. Keyboard shortcuts visible but not tutorial-like — discoverable through use. |
+| **Calm Confidence** | Muted color palette with strategic color accents for progress and success. No red for self-recovering errors — reserve red for "needs human action." Smooth animations, not flashy ones. |
+| **Reassuring Errors** | Errors show in amber/yellow with resolution status inline. Auto-retry timers visible. Errors that need attention use a gentle but distinct pattern — not a modal, but a persistent banner with a clear action. |
+| **Anti-Overwhelm** | Maximum 4-5 hero stats visible. Module grid uses progressive disclosure. Activity log is collapsible. Settings are tucked away. Every screen has a clear visual hierarchy. |
+| **Anti-Condescension** | No onboarding wizard. No tooltips on obvious actions. Technical language is fine (modules, units, embeddings, confidence scores). Status messages are terse and accurate. |
+| **Anti-Impatience** | Optimistic UI for search. Skeleton loading for knowledge entries. Prefetch likely next pages. Never show a blank screen while loading. |
+
+### Emotional Design Principles
+
+1. **Precision over personality** — The tool's emotional signature is competence, not charm. It should feel like a sharp instrument, not a friendly assistant. Clean typography, tight spacing, purposeful whitespace.
+
+2. **Earned trust through transparency** — Show just enough system state to build confidence without creating noise. Pipeline status, retry counts, and confidence scores are trust-building signals, not clutter.
+
+3. **Celebrate milestones, not micro-actions** — Don't animate every badge or flash every status change. Save celebratory moments for genuinely meaningful milestones (first badge, halfway, completion). Daily use should feel quiet and powerful.
+
+4. **Errors are conversations, not alarms** — Every error message should answer three questions: What happened? Is the system handling it? Do I need to do anything? If the answer to the third question is "no," the error should feel informational, not urgent.
+
+5. **Speed is an emotion** — Sub-100ms search results don't just feel fast, they feel *powerful*. Instant page transitions don't just save time, they create a sense of control. Performance IS the emotional design.
