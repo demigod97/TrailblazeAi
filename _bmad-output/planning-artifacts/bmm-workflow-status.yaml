@@ -57,10 +57,10 @@ workflow_status:
 
   # Phase 3: Solutioning
   create-architecture:
-    status: "required"
+    status: "_bmad-output/planning-artifacts/architecture.md"
     agent: "architect"
     command: "/bmad:bmm:workflows:create-architecture"
-    note: "Complete system design for greenfield project"
+    note: "Complete - 8-step workflow: 15 decisions, 23 patterns, full project structure, validation passed. Ready for implementation."
 
   create-epics-and-stories:
     status: "required"
