@@ -1,5 +1,5 @@
 ---
-stepsCompleted: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+stepsCompleted: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
 inputDocuments:
   - _bmad-output/planning-artifacts/product-brief-TrailblazeAi-2026-02-17.md
   - _bmad-output/planning-artifacts/prd.md
@@ -907,3 +907,236 @@ flowchart TD
 - Completed modules fade slightly and sort to the bottom — work moves "out of the way"
 - Stats update in real-time as modules complete — the numbers tell the story
 - No confetti, no celebration modals — just the satisfaction of watching numbers climb
+
+## Component Strategy
+
+### Design System Components (shadcn/ui Coverage)
+
+**Directly usable from shadcn/ui (no customization needed):**
+
+| Component | Usage in TrailBlazeAI |
+|-----------|----------------------|
+| `Button` | Approve, Edit, Save, Retry, Start actions |
+| `Input` | URL input field, search input, answer edit textarea |
+| `Badge` | Pipeline status labels (queued, scraping, processing, etc.) |
+| `Card` | Stat cards, module cards |
+| `Dialog` | Cmd+K omnibar modal |
+| `Toast` (via Sonner) | Error notifications, completion notices |
+| `Tooltip` | Icon-only sidebar tooltips, truncated text reveals |
+| `ScrollArea` | Pipeline list, review panel question list, knowledge results |
+| `Separator` | Section dividers within panels |
+| `Skeleton` | Loading states for pipeline list, stats, review panel |
+| `Command` | Cmd+K omnibar search (cmdk-based) |
+| `DropdownMenu` | Filter options, bulk actions, module row actions |
+| `Popover` | Settings controls, inline detail popovers |
+| `Tabs` | Knowledge base categories, settings sections |
+| `Textarea` | Quiz answer editing |
+| `Toggle` | Pause/resume scraper, settings switches |
+
+**Customized shadcn/ui (restyled with our tokens):**
+
+| Component | Customization |
+|-----------|--------------|
+| `Badge` | Extended with 7 pipeline status color variants using `--status-*` tokens |
+| `Progress` | Thin 4px variant with gradient fills per pipeline stage |
+| `Card` | Reduced border-radius to 8px, subtle hover border-color transition |
+| `Button` | Indigo primary, ghost variant for secondary, 6px border-radius |
+
+### Custom Components
+
+#### `AppShell`
+
+**Purpose:** Root layout managing the three-column CSS Grid (sidebar + pipeline + review panel)
+**Anatomy:** CSS Grid container with `grid-template-columns` that transitions when review panel opens/closes
+**States:**
+
+| State | Grid Columns | Condition |
+|-------|-------------|-----------|
+| Review open | `220px 1fr 340px` | Quiz-ready modules exist |
+| Review collapsed | `220px 1fr` | No modules need review |
+| Sidebar collapsed | `48px 1fr 340px` | Tablet breakpoint |
+| Mobile | Single column | <768px breakpoint |
+
+**Behavior:** Review panel column transitions on 200ms ease. `prefers-reduced-motion` makes instant.
+**Accessibility:** Landmark roles — `<nav>` for sidebar, `<main>` for pipeline, `<aside>` for review panel
+
+#### `Sidebar`
+
+**Purpose:** Primary navigation with page links and badge indicators
+**Anatomy:** Logo + nav items (icon + label) + settings link at bottom
+**States:**
+
+| State | Width | Display |
+|-------|-------|---------|
+| Expanded | 220px | Icon + label + optional badge count |
+| Collapsed | 48px | Icon only with tooltip on hover |
+| Active item | — | Highlighted background, indigo right border |
+
+**Variants:** Desktop expanded, tablet collapsed, mobile bottom tab bar
+**Accessibility:** `role="navigation"`, `aria-current="page"` on active item, tooltips on collapsed icons
+
+#### `StatCard`
+
+**Purpose:** Hero metric display (completed count, badges, accuracy, time saved)
+**Anatomy:** Label (text-xs, muted) + value (text-3xl, monospace, colored) + sub-label (text-xs, muted)
+**States:**
+
+| State | Behavior |
+|-------|----------|
+| Default | Static display |
+| Updating | Value animates on change (count up/down, 300ms) |
+| Loading | Skeleton placeholder |
+
+**Accessibility:** `aria-label` combining all three text elements (e.g., "47 of 89 modules completed")
+
+#### `ModuleRow`
+
+**Purpose:** Single module in the pipeline list — shows status, trail, progress
+**Anatomy:** Status badge + module name + trail label + progress bar (if active) + action button (if actionable)
+**States:**
+
+| State | Visual Treatment |
+|-------|-----------------|
+| Queued | Muted, no progress bar |
+| Scraping | Cyan border accent, progress bar with cyan fill |
+| Processing | Purple border accent, progress bar with purple fill |
+| Quiz-ready | Amber border accent, "Review" button visible |
+| Completed | Faded opacity (0.6), sorted to bottom |
+| Error | Red border accent, error message + "Retry" button |
+
+**Actions:** Click quiz-ready row → scrolls review panel to that module's questions
+**Accessibility:** `role="listitem"`, status announced via `aria-label`, action buttons have descriptive labels
+
+#### `ReviewPanel`
+
+**Purpose:** Persistent right panel for quiz question review
+**Anatomy:** Header (module name + question count) + question display + answer card + confidence bar + action buttons
+**States:**
+
+| State | Behavior |
+|-------|----------|
+| Hidden | Width 0, not rendered in DOM |
+| Open | Slides in at 340px, shows current review queue |
+| Reviewing | Displays one question at a time with AI answer |
+| Empty queue | Auto-collapses after last question approved |
+
+**Behavior:** Panel entrance 200ms ease from right. Question transitions use opacity fade.
+**Accessibility:** `role="complementary"`, `aria-live="polite"` for question changes, focus trapped in panel when reviewing
+
+#### `QuizQuestion`
+
+**Purpose:** Single quiz question with AI-generated answer and review actions
+**Anatomy:** Question counter (Q1 of 5) + question text + answer card (indigo background) + confidence bar + Approve/Edit buttons
+**States:**
+
+| State | Behavior |
+|-------|----------|
+| Reviewing | Question + answer displayed, actions enabled |
+| Editing | Answer text in editable textarea, Save/Cancel replace Approve/Edit |
+| Approved | Brief success flash, auto-advances to next question |
+| Low confidence | Confidence bar amber/red, "Low confidence" label shown |
+
+**Actions:** Approve (advance), Edit (enter edit mode), Save (confirm edit), Cancel (revert edit)
+**Accessibility:** Question and answer linked via `aria-describedby`, confidence percentage read aloud, keyboard: Enter to approve, E to edit
+
+#### `ConfidenceBar`
+
+**Purpose:** Visual representation of AI answer confidence
+**Anatomy:** Thin bar (48px wide, 4px tall) with colored fill + percentage label
+**States:**
+
+| Range | Color | Extra |
+|-------|-------|-------|
+| ≥90% | Green fill | — |
+| 70–89% | Amber fill | — |
+| <70% | Red fill | "Low confidence" label |
+
+**Accessibility:** `role="meter"`, `aria-valuenow`, `aria-valuemin="0"`, `aria-valuemax="100"`, `aria-label="Confidence: 94%"`
+
+#### `PipelineFilter`
+
+**Purpose:** Filter chip bar for slicing pipeline by status
+**Anatomy:** Row of filter chips with counts — All (89), Review (3), Active (3), Error (0), Done (47)
+**States:**
+
+| State | Behavior |
+|-------|----------|
+| Default | One chip active (All), others neutral |
+| Filtered | Active chip highlighted with indigo accent, list filters |
+| Zero-count | Chip still visible but muted (e.g., "Error (0)") |
+
+**Behavior:** Single-select. Click chip → pipeline list filters. Counts update in real-time.
+**Accessibility:** `role="radiogroup"` with `role="radio"` on each chip
+
+#### `URLInput`
+
+**Purpose:** Trail/trailmix URL submission input with inline validation
+**Anatomy:** Icon prefix (→) + text input + submit button (or spinner when importing)
+**States:**
+
+| State | Visual Treatment |
+|-------|-----------------|
+| Empty | Placeholder text "Paste a Trailhead trail or module URL..." |
+| Focused | Indigo ring, placeholder fades |
+| Validating | Spinner replaces submit button |
+| Error | Red border, inline error message below |
+| Success | Input clears, pipeline populates |
+
+**Accessibility:** `aria-label="Trail URL input"`, error linked via `aria-describedby`
+
+### Component Implementation Strategy
+
+**Build approach:**
+- All custom components built with React Server Components where possible (stat cards, sidebar)
+- Client components only where interactivity requires it (review panel, quiz question, URL input)
+- Composed from shadcn/ui primitives — custom components wrap `Card`, `Badge`, `Button`, `Progress` etc.
+- Styled with Tailwind v4 using the semantic tokens defined in the Visual Design Foundation
+- All components accept `className` prop for composition
+
+**File organization:**
+
+```
+apps/web/src/components/
+  ui/                    → shadcn/ui components (generated)
+  layout/
+    app-shell.tsx        → AppShell grid layout
+    sidebar.tsx          → Navigation sidebar
+    review-panel.tsx     → Quiz review panel
+  pipeline/
+    stat-card.tsx        → Hero metric card
+    module-row.tsx       → Pipeline module row
+    pipeline-filter.tsx  → Status filter chips
+    url-input.tsx        → URL submission input
+  review/
+    quiz-question.tsx    → Question + answer + actions
+    confidence-bar.tsx   → Confidence meter
+  knowledge/
+    search-results.tsx   → Knowledge search results list
+    knowledge-detail.tsx → Knowledge entry detail view
+```
+
+### Implementation Roadmap
+
+**Phase 1 — Core Shell (needed for any page to render):**
+- `AppShell` — three-column grid layout
+- `Sidebar` — navigation between pages
+- `URLInput` — trail submission (Act 1 entry point)
+
+**Phase 2 — Pipeline View (Act 2 — the main experience):**
+- `StatCard` — hero metrics at top
+- `ModuleRow` — pipeline list items
+- `PipelineFilter` — status filter chips
+- Customized `Badge` with 7 status variants
+- Customized `Progress` with thin gradient variant
+
+**Phase 3 — Review Experience (Act 3 — the active moment):**
+- `ReviewPanel` — sliding right panel
+- `QuizQuestion` — question + answer display
+- `ConfidenceBar` — confidence meter
+- Answer editing textarea integration
+
+**Phase 4 — Knowledge Base (post-completion value):**
+- Knowledge search results list
+- Knowledge entry detail view
+- Concept relationship links
+- Cmd+K omnibar integration (shadcn `Command`)
