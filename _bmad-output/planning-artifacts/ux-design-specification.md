@@ -1,5 +1,5 @@
 ---
-stepsCompleted: [1, 2, 3, 4, 5]
+stepsCompleted: [1, 2, 3, 4, 5, 6]
 inputDocuments:
   - _bmad-output/planning-artifacts/product-brief-TrailblazeAi-2026-02-17.md
   - _bmad-output/planning-artifacts/prd.md
@@ -274,3 +274,67 @@ The **full completion** moment is the most critical — it must feel like a genu
 - GitHub Actions' log-heavy default view — logs should be opt-in, not the default surface
 - Notion's block-editor paradigm — knowledge entries are read-only, not editable documents
 - Any form of gamification beyond natural Trailhead badge display — this is a productivity tool, not a game
+
+## Design System Foundation
+
+### Design System Choice
+
+**shadcn/ui** (new-york style) with Tailwind CSS v4 and Radix UI primitives.
+
+This is a copy-paste component library, not a dependency. Components live in `apps/web/src/components/ui/` and are fully owned by the project. Radix UI provides headless, accessible primitives (dialogs, popovers, dropdowns, tooltips). Tailwind CSS v4 handles all styling through CSS-first configuration (`@import "tailwindcss"`). shadcn/ui connects the two with well-designed defaults.
+
+### Rationale for Selection
+
+- **Already scaffolded** — The project already has shadcn/ui installed with new-york style. Switching would be waste, not improvement.
+- **Full ownership** — Components are copied into the project, not imported from `node_modules`. Every component can be modified without fighting upstream opinions.
+- **Accessibility by default** — Radix primitives handle keyboard navigation, focus management, ARIA attributes, and screen reader announcements. The "powerful & precise" personality requires flawless keyboard interaction — Radix delivers this without custom work.
+- **Tailwind v4 alignment** — CSS-first configuration means design tokens are CSS custom properties, not JavaScript objects. This aligns with the performance-first philosophy (no runtime CSS-in-JS).
+- **Developer-tool aesthetic** — shadcn/ui's visual language (muted backgrounds, sharp borders, monospace accents) matches the command-line companion personality without additional customization.
+- **Single-developer optimization** — No design system governance overhead. One developer, one set of opinions. shadcn/ui's copy-paste model means zero abstraction tax.
+
+### Implementation Approach
+
+**Component Strategy:**
+- Use shadcn/ui components as the base for all standard UI patterns (buttons, inputs, dialogs, cards, tables, dropdowns, tooltips, popovers)
+- Build custom composite components by composing shadcn primitives (e.g., `ModuleCard` composes `Card` + `Badge` + `Progress`)
+- Reserve fully custom components for domain-specific visualizations only (concept graph, pipeline flow, progress ring)
+
+**CSS Architecture:**
+- Tailwind CSS v4 with CSS-first config (`@import "tailwindcss"`)
+- Design tokens as CSS custom properties in `:root` and `[data-theme="dark"]`
+- No runtime CSS-in-JS — all styles resolve at build time
+- Utility-first with `@apply` only for repeated patterns in custom components
+
+**Color Mode Implementation:**
+- System-preference detection via `prefers-color-scheme` media query on initial load
+- Manual toggle via `data-theme` attribute on `<html>` element, persisted to `localStorage`
+- Both light and dark tokens defined from day one — no "add dark mode later" tech debt
+- CSS custom properties switch values based on `data-theme`, components don't need conditional logic
+
+**Typography:**
+- **Primary:** IBM Plex Sans — sharp, screen-optimized, professional. Loaded via `next/font` for zero layout shift.
+- **Monospace:** IBM Plex Mono (or Geist Mono) — for code snippets, knowledge entry metadata, pipeline logs, and status indicators
+- **Scale:** 12px (caption/metadata) → 14px (body/default) → 16px (subheading) → 20px (heading) → 28px (hero stat) → 36px (page title)
+- **Weight range:** 400 (body), 500 (emphasis/labels), 600 (headings), 700 (hero stats only)
+
+### Customization Strategy
+
+**Design Token Overrides:**
+- Override shadcn/ui's default HSL color tokens with a custom palette that reflects the "intelligent automation" personality
+- Primary color: a cool blue or teal (precision, intelligence) — not warm, not playful
+- Accent color: a contrasting signal color for active states and CTAs
+- Destructive/warning: standard red/amber — don't reinvent error colors
+- Muted backgrounds: subtle gray tones for cards and surfaces, high contrast for text
+
+**Component Customizations:**
+- `Card` — Adjust border radius and shadow for the sharp, technical aesthetic. Less rounded, more defined edges.
+- `Badge` — Custom variants for module status states: `queued`, `scraping`, `processing`, `ready`, `completed`, `error`
+- `Progress` — Custom ring variant for circular progress display on hero stats
+- `Table` — Dense variant for knowledge base table view with tight row spacing
+- `Dialog` — Cmd+K omnibar as a custom `CommandDialog` (shadcn/ui already has a `Command` component based on cmdk)
+
+**Spacing & Layout:**
+- 4px base unit, 8px standard gap, 16px section spacing, 24px page padding
+- Content max-width: 1200px for dashboard, full-width for knowledge explorer
+- Sidebar width: 240px expanded, 48px collapsed (icon-only)
+- Consistent 8px grid alignment for all component placement
