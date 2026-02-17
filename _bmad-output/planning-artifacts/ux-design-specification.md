@@ -1,5 +1,5 @@
 ---
-stepsCompleted: [1, 2, 3, 4]
+stepsCompleted: [1, 2, 3, 4, 5]
 inputDocuments:
   - _bmad-output/planning-artifacts/product-brief-TrailblazeAi-2026-02-17.md
   - _bmad-output/planning-artifacts/prd.md
@@ -186,3 +186,91 @@ The **full completion** moment is the most critical — it must feel like a genu
 4. **Errors are conversations, not alarms** — Every error message should answer three questions: What happened? Is the system handling it? Do I need to do anything? If the answer to the third question is "no," the error should feel informational, not urgent.
 
 5. **Speed is an emotion** — Sub-100ms search results don't just feel fast, they feel *powerful*. Instant page transitions don't just save time, they create a sense of control. Performance IS the emotional design.
+
+## UX Pattern Analysis & Inspiration
+
+### Inspiring Products Analysis
+
+#### Vercel Dashboard
+- **What it nails:** Deployment status as the hero element. Clean cards with clear state indicators (building, ready, error). The activity log shows what happened without overwhelming. The project grid is scannable.
+- **UX lesson:** Status should be the first thing you see, not the first thing you have to find. Cards > tables for status-at-a-glance.
+- **Borrow:** Hero stat cards for the progress dashboard. Deployment-style flow visualization for the scrape → process → quiz pipeline.
+
+#### GitHub Actions
+- **What it nails:** Pipeline-as-timeline visualization. Expandable step logs. Clear pass/fail per step. The run list shows enough metadata to decide if you need to drill in.
+- **UX lesson:** Pipeline UX works when each step has a clear state and you can expand only what matters. Logs should be there but hidden by default.
+- **Borrow:** Step-by-step pipeline view for module processing. Expandable log sections for active monitoring mode.
+
+#### Linear
+- **What it nails:** Cmd+K omnibar that searches issues, projects, and commands in one input. Left sidebar navigation is clean and scannable. Keyboard shortcuts for everything. Speed is a feature — every action feels instant.
+- **UX lesson:** A unified search input eliminates the need for users to know where things live. Speed creates an emotional response of control.
+- **Borrow:** Cmd+K omnibar as the global search pattern. Left sidebar navigation structure. Keyboard shortcut system. The "fast by default" performance standard.
+
+#### VS Code / Cursor
+- **What it nails:** Command palette (Cmd+Shift+P) separates search from commands. Search results show rich context (file path, line preview, icon). Sidebar sections are collapsible and rearrangeable.
+- **UX lesson:** Search results need context — a bare title isn't enough. Show the module name, concept type, and a content preview in every result.
+- **Borrow:** Rich search result formatting with context snippets. Collapsible sidebar sections for the knowledge explorer.
+
+#### Notion (Database Views)
+- **What it nails:** Multiple views on the same data — table, board, gallery, list. Filter chips for quick slicing. Inline editing. Real-time updates without page refresh.
+- **UX lesson:** The module grid benefits from multiple view modes (card grid for overview, table for detail). Filter chips let you slice by status, trail, or completion without a complex filter UI.
+- **Borrow:** Filter chips for the module grid (by status, by trail, by completion). Table view as an alternative to card grid for power-user detail needs.
+
+#### Obsidian (Graph View)
+- **What it nails:** Interactive node graph showing document relationships. Zoom and pan. Click a node to navigate. Color coding by folder/tag. The graph reveals structure you didn't know existed.
+- **UX lesson:** A knowledge graph isn't just visualization — it's a discovery tool. Showing concept relationships helps users understand how Salesforce topics connect.
+- **Borrow:** Interactive concept graph with zoom, pan, and click-to-navigate. Color coding by Salesforce domain (Admin, Developer, Security, etc.).
+
+### Transferable UX Patterns
+
+**Navigation Patterns:**
+- **Left sidebar** (Linear/Notion) — Fixed sidebar with section icons + labels: Dashboard, Knowledge, Quiz Review, Settings. Collapsible for more content space.
+- **Cmd+K omnibar** (Linear) — Global search for knowledge entries, modules, commands, and navigation. One input searches everything.
+- **Breadcrumb context** (VS Code) — In knowledge explorer, show the path: Trail → Module → Unit → Concept. Always know where you are.
+
+**Interaction Patterns:**
+- **Filter chips** (Notion) — Quick status filters on the module grid. No complex filter dialogs. Click a chip, see filtered results.
+- **Expandable sections** (GitHub Actions) — Pipeline logs, module details, and activity entries expand on demand. Collapsed by default.
+- **Keyboard-driven list navigation** (Linear) — Arrow keys to move through search results, module lists, and knowledge entries. Enter to select, Esc to dismiss.
+
+**Information Display Patterns:**
+- **Hero stat cards** (Vercel) — 4-5 top-level metrics as large, prominent cards. Modules completed, badges earned, accuracy, time remaining.
+- **Rich search results** (VS Code) — Each result shows: title, module attribution, content preview, concept type icon. Not just a list of titles.
+- **Interactive graph** (Obsidian) — Concept relationship visualization with zoom, pan, click-to-navigate, and domain color coding.
+
+**Status & Progress Patterns:**
+- **Deployment flow** (Vercel) — Module pipeline shown as a flow: scraping → processing → embedding → quiz → done. Clear state per step.
+- **Activity log** (GitHub Actions) — Scrollable, timestamped log of recent actions. Newest at top. Collapsible.
+- **Real-time updates** (Notion) — Supabase Realtime pushes status changes without polling. Cards update in place, no page refresh.
+
+### Anti-Patterns to Avoid
+
+| Anti-Pattern | Why It's Wrong for TrailBlazeAI | What to Do Instead |
+|-------------|-------------------------------|-------------------|
+| **Onboarding wizards** | Condescending for a developer tool. Paste URL + Enter is the onboarding. | Smart defaults, no wizard. Show a single-field start screen. |
+| **Modal confirmations** | "Are you sure?" dialogs break flow and imply the user doesn't know what they're doing. | Undo-able actions instead of confirmations. Trust the user. |
+| **Dashboard widget configurability** | Over-engineering for a single-user tool. Don't build a dashboard builder. | Fixed, well-designed layout. One great default beats infinite customization. |
+| **Notification badges/bells** | Creates anxiety. This is a personal tool, not a collaboration platform. | Inline status updates. The dashboard IS the notification surface. |
+| **Loading spinners in the critical path** | Kills the "powerful & precise" feeling. Every spinner is a broken promise. | Skeleton loading, optimistic UI, and prefetching. Show structure immediately. |
+| **Tabs inside tabs** | Nested navigation creates confusion about where you are. | Flat hierarchy: sidebar → content area. One level of navigation. |
+| **Pie charts for progress** | Hard to read, wastes space, adds no precision. | Progress bars or numeric displays. "47/89 modules" is clearer than any chart. |
+
+### Design Inspiration Strategy
+
+**Adopt directly:**
+- Linear's Cmd+K omnibar as the global search — one input for knowledge, modules, commands, navigation
+- Linear's left sidebar navigation — clean, icon + label, collapsible
+- Vercel's hero stat cards — 4-5 top-level metrics, prominent and glanceable
+- GitHub Actions' expandable pipeline logs — collapsed by default, expand on demand
+
+**Adapt for TrailBlazeAI:**
+- VS Code's rich search results → adapt for knowledge entries with module attribution, concept type, and content preview
+- Obsidian's graph view → adapt as a Salesforce concept relationship graph with domain color coding
+- Notion's filter chips → adapt for module grid filtering by status, trail, and completion state
+- Notion's database views → adapt as card grid (default) + table view (detail) toggle for modules
+
+**Avoid deliberately:**
+- Vercel's project-switching complexity — single user, single project, no need for multi-project navigation
+- GitHub Actions' log-heavy default view — logs should be opt-in, not the default surface
+- Notion's block-editor paradigm — knowledge entries are read-only, not editable documents
+- Any form of gamification beyond natural Trailhead badge display — this is a productivity tool, not a game
