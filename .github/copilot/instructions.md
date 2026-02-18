@@ -82,3 +82,23 @@ pnpm --filter @trailblaze/api dev     # Fastify dev server only
 | `apps/api/src/config.ts` | Zod-validated environment config |
 | `packages/shared/src/types/trailhead.ts` | Domain type definitions |
 | `docker/docker-compose.yml` | Docker service definitions |
+
+## BMAD V6 Protocol (MANDATORY)
+
+This project uses the BMAD V6 framework for development governance. All code generation and suggestions MUST follow these rules.
+
+### Key Artifacts
+
+- Workflow status: `_bmad-output/planning-artifacts/bmm-workflow-status.yaml`
+- Project context: `_bmad-output/planning-artifacts/project-context.md`
+- Architecture: `_bmad-output/planning-artifacts/architecture.md`
+- PRD: `_bmad-output/planning-artifacts/PRD.md`
+
+### Rules for Code Generation
+
+1. **Respect the current phase** -- Check `bmm-workflow-status.yaml`. The project follows 4 phases: Analysis -> Planning -> Solutioning -> Implementation. Do not generate implementation code until the project reaches Implementation phase.
+2. **Story-scoped changes only** -- When implementing, only write code for the assigned story's tasks/subtasks. Do not add extra features, utilities, or abstractions beyond the story scope.
+3. **Architecture compliance** -- All generated code must follow patterns defined in `_bmad-output/planning-artifacts/architecture.md`. Check this file before suggesting architectural decisions.
+4. **Test-first development** -- When generating new functionality, also generate corresponding test stubs. Follow the red-green-refactor cycle.
+5. **Project context rules** -- Read `_bmad-output/planning-artifacts/project-context.md` for specific implementation constraints and patterns that must be followed.
+6. **No fake tests** -- Never generate test code that simply passes without actually testing the behavior. Tests must verify real acceptance criteria.

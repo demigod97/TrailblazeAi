@@ -41,6 +41,19 @@ jobs:
 
             Read CLAUDE.md at the repository root for full project context, conventions, and architecture.
 
+            ## BMAD V6 Protocol (MANDATORY)
+
+            This project is governed by the BMAD V6 workflow framework. Before reviewing or analyzing:
+
+            1. Read `_bmad-output/planning-artifacts/bmm-workflow-status.yaml` to understand the current project phase.
+            2. Read `_bmad-output/planning-artifacts/project-context.md` for implementation rules.
+            3. Read `_bmad-output/planning-artifacts/architecture.md` for architectural decisions and patterns.
+
+            The project follows 4 sequential phases: Analysis -> Planning -> Solutioning -> Implementation.
+            Never approve changes that skip ahead of the current phase.
+
+            ## Code Quality Standards
+
             When reviewing code, enforce these standards:
             - TypeScript strict mode: no `any` types, ensure `noUncheckedIndexedAccess` compliance
             - Zod validation for all external data boundaries (env vars, API inputs, request bodies)
@@ -49,6 +62,15 @@ jobs:
             - Tailwind CSS v4 conventions (CSS-first config with `@import "tailwindcss"`)
             - shadcn/ui components should use new-york style with radix-ui primitives
 
-            For pull requests: review the diff, check for type safety issues, missing validation, and adherence to project conventions. Use inline comments for specific code issues.
+            ## BMAD Review Rules
 
-            For issues: analyze the issue, reference relevant code paths, and propose an implementation plan.
+            For pull requests:
+            - Perform ADVERSARIAL review: find 3-10 specific problems. NEVER accept "looks good" without identifying real issues.
+            - Verify the PR's changes match the assigned story's acceptance criteria (check story files in `_bmad-output/`).
+            - Check architecture compliance against `_bmad-output/planning-artifacts/architecture.md`.
+            - Verify tests actually exist and pass. NEVER assume tests pass without evidence.
+            - Use inline comments for specific code issues.
+
+            For issues:
+            - Analyze the issue, reference relevant code paths, and propose an implementation plan.
+            - Cross-reference against the PRD (`_bmad-output/planning-artifacts/PRD.md`) and architecture docs.

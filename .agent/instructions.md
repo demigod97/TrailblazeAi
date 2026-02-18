@@ -50,17 +50,43 @@ pnpm --filter @trailblaze/api dev    # Fastify dev server (tsx watch)
 
 ## BMAD V6 Workflow Framework
 
-The project uses the BMAD V6 framework for planning and workflow management:
+The project uses the BMAD V6 framework for planning and workflow management. **All agents MUST follow BMAD protocols.**
 
-- Framework location: `_bmad/` -- contains agents, workflows, and templates
+### BMAD File Locations
+
+- Framework: `_bmad/` -- agents, workflows, templates
 - Configuration: `_bmad/bmm/config.yaml`
 - Output artifacts: `_bmad-output/planning-artifacts/`
 - Workflow status: `_bmad-output/planning-artifacts/bmm-workflow-status.yaml`
-- Planning research: `_bmad-output/planning-artifacts/research/`
-- Product brief: `_bmad-output/planning-artifacts/product-brief.md`
+- Project context: `_bmad-output/planning-artifacts/project-context.md`
 - PRD: `_bmad-output/planning-artifacts/PRD.md`
+- Architecture: `_bmad-output/planning-artifacts/architecture.md`
 
-When working on planning or architecture tasks, consult the BMAD artifacts for context.
+### BMAD Activation Protocol (MANDATORY)
+
+Before starting any task:
+
+1. **Read workflow status** -- Check `_bmad-output/planning-artifacts/bmm-workflow-status.yaml` to determine the current project phase
+2. **Respect phase gates** -- The project follows 4 sequential phases: Analysis -> Planning -> Solutioning -> Implementation. Never skip ahead.
+3. **Load project context** -- Read `_bmad-output/planning-artifacts/project-context.md` for implementation rules and patterns
+
+### BMAD Implementation Rules
+
+When writing or modifying code:
+
+1. **Story is single source of truth** -- Only implement what is described in the assigned story file's tasks/subtasks. Do not add features beyond the story scope.
+2. **Red-green-refactor** -- Write a failing test first, then write implementation to pass it, then refactor. This cycle is mandatory.
+3. **Mark tasks complete honestly** -- Only mark story tasks as `[x]` when BOTH implementation AND tests pass. Never lie about test results.
+4. **Run full test suite** -- After completing each task, run the full test suite. Never proceed with failing tests.
+5. **Architecture compliance** -- Verify all patterns match `_bmad-output/planning-artifacts/architecture.md`
+
+### BMAD Code Review Protocol
+
+When reviewing code (PRs, diffs, or changes):
+
+1. **Adversarial review** -- Find 3-10 specific problems in every review. NEVER accept "looks good" without identifying real issues.
+2. **Story compliance** -- Verify the implementation matches story acceptance criteria exactly.
+3. **Test verification** -- Tests must actually exist and pass 100%. Verify, don't assume.
 
 ## Important Paths
 

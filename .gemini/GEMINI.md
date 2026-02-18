@@ -61,12 +61,41 @@ pnpm --filter @trailblaze/api dev    # Fastify dev server (tsx watch)
 | `packages/shared/src/types/trailhead.ts` | Domain type definitions |
 | `docker/docker-compose.yml` | Docker service definitions |
 
-## BMAD Reference
+## BMAD V6 Protocol (MANDATORY)
 
-- Framework at `_bmad/` -- agents, workflows, templates
+This project is governed by the BMAD V6 framework. All agents and tools MUST follow these protocols.
+
+### File Locations
+
+- Framework: `_bmad/` -- agents, workflows, templates
 - Config: `_bmad/bmm/config.yaml`
 - Output: `_bmad-output/planning-artifacts/`
 - Workflow status: `_bmad-output/planning-artifacts/bmm-workflow-status.yaml`
+- Project context: `_bmad-output/planning-artifacts/project-context.md`
+- Architecture: `_bmad-output/planning-artifacts/architecture.md`
+- PRD: `_bmad-output/planning-artifacts/PRD.md`
+
+### Activation Protocol
+
+Before starting any task:
+
+1. **Check workflow status** -- Read `bmm-workflow-status.yaml` to determine current phase
+2. **Respect phase gates** -- 4 phases: Analysis -> Planning -> Solutioning -> Implementation. Never skip ahead.
+3. **Load project context** -- Read `project-context.md` for implementation rules and constraints
+
+### Implementation Rules
+
+1. **Story is single source of truth** -- Only implement what the assigned story describes. No scope creep.
+2. **Red-green-refactor** -- Write failing test first, then implementation, then refactor. Mandatory cycle.
+3. **Honest task completion** -- Mark tasks `[x]` only when BOTH implementation AND tests pass. Never fake test results.
+4. **Full test suite** -- Run all tests after each task. Never proceed with failures.
+5. **Architecture compliance** -- All patterns must match `architecture.md`
+
+### Code Review Rules
+
+1. **Adversarial review** -- Find 3-10 specific problems per review. Never accept "looks good."
+2. **Story compliance** -- Verify implementation matches story acceptance criteria exactly.
+3. **Test verification** -- Confirm tests exist and pass 100%. Never assume.
 
 ## Environment Variables
 
