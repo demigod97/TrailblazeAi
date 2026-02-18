@@ -1,5 +1,5 @@
 ---
-stepsCompleted: [step-01-validate-prerequisites, step-02-design-epics]
+stepsCompleted: [step-01-validate-prerequisites, step-02-design-epics, step-03-create-stories]
 inputDocuments:
   - _bmad-output/planning-artifacts/prd.md
   - _bmad-output/planning-artifacts/architecture.md
@@ -731,3 +731,83 @@ So that completing quizzes earns badges and results are recorded.
 **When** I view the dashboard
 **Then** I can see which modules have earned badges vs. which are pending
 **And** GET /api/quiz-results returns all results with filtering by module_id and correct status
+
+## Epic 5: Pipeline Operations & Monitoring
+
+Demi can configure pipeline behavior (priority tracks, quiz-only mode), pause/resume/cancel processing runs, monitor system health and agent costs, and manage multi-day unattended runs with full operational visibility.
+
+### Story 5.1: Pipeline Configuration & Run Control
+
+As a user,
+I want to configure pipeline behavior and pause/resume/cancel runs,
+So that I can control automation during multi-day processing.
+
+**Acceptance Criteria:**
+
+**Given** I navigate to the Settings page
+**When** the page loads
+**Then** I see pipeline configuration options: priority track selection, quiz-only mode toggle, and skip-completed toggle
+**And** current values are loaded from the database
+
+**Given** I enable "quiz-only mode"
+**When** I save the setting
+**Then** the pipeline skips content extraction for modules that already have quiz items
+**And** queued scrape jobs for those modules are cancelled
+**And** a toast confirms: "Pipeline mode updated" (3s)
+
+**Given** a pipeline run is in progress
+**When** I click "Pause Pipeline"
+**Then** all pg-boss queues are paused via boss.pause() and no new jobs are picked up
+**And** currently running jobs complete gracefully (not killed mid-execution)
+**And** the dashboard shows a "Paused" banner with a "Resume" button
+
+**Given** the pipeline is paused
+**When** I click "Resume Pipeline"
+**Then** all pg-boss queues resume via boss.resume()
+**And** queued jobs begin processing again from where they left off
+**And** the "Paused" banner disappears
+
+**Given** I want to cancel a run entirely
+**When** I click "Cancel Run" and confirm the dialog
+**Then** all queued jobs for the run are removed from pg-boss
+**And** in-progress jobs complete gracefully
+**And** module statuses for unfinished modules remain at their current state (not reset)
+
+**Given** I configure priority track
+**When** I select a specific track (e.g., "Admin", "Developer")
+**Then** modules matching that track receive priority=1 in the job queue
+**And** other modules are demoted to priority=5
+
+### Story 5.2: Aggregated Progress & Cost Tracking
+
+As a user,
+I want to see aggregated progress metrics and agent cost tracking,
+So that I have full operational visibility during multi-day runs.
+
+**Acceptance Criteria:**
+
+**Given** a pipeline run is active or completed
+**When** I call GET /api/progress
+**Then** I receive aggregated metrics: modules completed, modules total, badges earned, quiz accuracy percentage, chunks indexed, and estimated total cost
+**And** the response updates in real-time as modules complete
+
+**Given** an agent performs an action (LLM call, embedding, MCP tool use)
+**When** the action completes
+**Then** a ToolTrace entry is logged to the agent_logs table with: run_id, agent_type, tool_type, query, raw_output (truncated 50KB), summary, input_tokens, output_tokens, estimated_cost_usd, duration_ms, confidence_score (quiz agent only), and related_chunk_ids
+
+**Given** I want to see cost breakdown
+**When** I view the Settings page cost section
+**Then** I see per-run cost summary grouped by agent type (scraper, knowledge, quiz, documentation)
+**And** totals for input tokens, output tokens, and estimated USD cost
+**And** the hero stat card "time saved" shows estimated hours of manual Trailhead work replaced
+
+**Given** the system has been running unattended
+**When** I check the dashboard after several hours
+**Then** I see an accurate live agent log feed (Supabase Realtime Pattern B: useState direct updates)
+**And** the feed shows: agent name, action description, timestamp, and cost per action
+**And** the feed auto-scrolls to latest entries with a "Jump to latest" button if scrolled up
+
+**Given** I want to review historical run data
+**When** I view past runs on the Settings page
+**Then** I see a list of all runs with: start time, end time, modules processed, total cost, and final status
+**And** clicking a run shows its detailed agent log history
