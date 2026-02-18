@@ -1,5 +1,8 @@
 @import "tailwindcss";
 
+/* Enable .dark class-based dark mode for manual theme switching */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @layer base {
   :root {
     --background: oklch(1 0 0);
@@ -8,31 +11,44 @@
     --card-foreground: oklch(0.145 0 0);
     --popover: oklch(1 0 0);
     --popover-foreground: oklch(0.145 0 0);
-    --primary: oklch(0.205 0.042 265.755);
+    --primary: oklch(0.452 0.188 264);
     --primary-foreground: oklch(0.985 0 0);
     --secondary: oklch(0.97 0 0);
-    --secondary-foreground: oklch(0.205 0.042 265.755);
+    --secondary-foreground: oklch(0.452 0.188 264);
     --muted: oklch(0.97 0 0);
     --muted-foreground: oklch(0.556 0.014 265.755);
     --accent: oklch(0.97 0 0);
-    --accent-foreground: oklch(0.205 0.042 265.755);
+    --accent-foreground: oklch(0.452 0.188 264);
     --destructive: oklch(0.577 0.245 27.325);
     --destructive-foreground: oklch(0.985 0 0);
     --border: oklch(0.922 0 0);
     --input: oklch(0.922 0 0);
-    --ring: oklch(0.708 0.165 254.624);
+    --ring: oklch(0.452 0.188 264);
     --radius: 0.625rem;
+
+    /* Font variables */
+    --font-sans: 'IBM Plex Sans', system-ui, sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+
+    /* Pipeline status colors */
+    --status-queued: oklch(0.65 0 0);
+    --status-scraping: oklch(0.65 0.14 195);
+    --status-processing: oklch(0.62 0.18 295);
+    --status-embedding: oklch(0.52 0.18 264);
+    --status-quiz-ready: oklch(0.78 0.17 85);
+    --status-completed: oklch(0.65 0.15 145);
+    --status-error: oklch(0.58 0.23 28);
   }
 
-  .dark {
+  [data-theme="dark"] {
     --background: oklch(0.145 0 0);
     --foreground: oklch(0.985 0 0);
     --card: oklch(0.145 0 0);
     --card-foreground: oklch(0.985 0 0);
     --popover: oklch(0.145 0 0);
     --popover-foreground: oklch(0.985 0 0);
-    --primary: oklch(0.985 0 0);
-    --primary-foreground: oklch(0.205 0.042 265.755);
+    --primary: oklch(0.652 0.188 264);
+    --primary-foreground: oklch(0.145 0 0);
     --secondary: oklch(0.269 0 0);
     --secondary-foreground: oklch(0.985 0 0);
     --muted: oklch(0.269 0 0);
@@ -43,7 +59,7 @@
     --destructive-foreground: oklch(0.985 0 0);
     --border: oklch(0.269 0 0);
     --input: oklch(0.269 0 0);
-    --ring: oklch(0.439 0.088 265.755);
+    --ring: oklch(0.652 0.188 264);
   }
 }
 
@@ -54,5 +70,12 @@
   body {
     background-color: var(--background);
     color: var(--foreground);
+    font-family: var(--font-sans);
+  }
+}
+
+@layer utilities {
+  .font-mono {
+    font-family: var(--font-mono);
   }
 }

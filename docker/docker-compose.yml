@@ -1,16 +1,24 @@
+version: '3.8'
+
 services:
   api:
     build:
       context: ..
       dockerfile: docker/api.Dockerfile
-    ports:
-      - "3001:3001"
+    expose:
+      - "3001"
     env_file:
       - ../.env
     deploy:
       resources:
         limits:
           memory: 512M
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
     networks:
       - trailblaze
     restart: unless-stopped
@@ -26,6 +34,31 @@ services:
       resources:
         limits:
           memory: 3G
+          cpus: '3.0'
+    volumes:
+      - playwright-profiles:/data/playwright-profiles
+    networks:
+      - trailblaze
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:1.27-alpine
+    # envsubst substitutes $DOMAIN_NAME before nginx starts (nginx:alpine doesn't auto-process nginx.conf)
+    command: >
+      /bin/sh -c "envsubst '$$DOMAIN_NAME' < /etc/nginx/nginx.conf.template > /etc/nginx/nginx.conf
+      && exec nginx -g 'daemon off;'"
+    environment:
+      - DOMAIN_NAME=${DOMAIN_NAME:-localhost}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf.template:ro
+      - certbot-conf:/etc/letsencrypt:ro
+      - nginx-logs:/var/log/nginx
+    depends_on:
+      api:
+        condition: service_healthy
     networks:
       - trailblaze
     restart: unless-stopped
@@ -33,3 +66,11 @@ services:
 networks:
   trailblaze:
     driver: bridge
+
+volumes:
+  playwright-profiles:
+    driver: local
+  certbot-conf:
+    driver: local
+  nginx-logs:
+    driver: local

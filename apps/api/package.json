@@ -7,11 +7,13 @@
     "dev": "tsx watch src/index.ts",
     "build": "tsup src/index.ts --format esm --dts",
     "start": "node dist/index.js",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "test": "vitest run"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^3",
     "@ai-sdk/mcp": "^0",
+    "@browserbasehq/stagehand": "^3",
     "@fastify/bearer-auth": "^10",
     "@fastify/cors": "^11",
     "@fastify/rate-limit": "^10",
@@ -19,13 +21,17 @@
     "@trailblaze/shared": "workspace:*",
     "ai": "^6",
     "fastify": "^5.2",
+    "fastify-plugin": "^5.1.0",
+    "node-html-parser": "^7.0.2",
     "pg-boss": "^10",
+    "yaml": "^2",
     "zod": "^3.24"
   },
   "devDependencies": {
     "@types/node": "^25",
     "tsup": "^8",
     "tsx": "^4.19",
-    "typescript": "^5.7"
+    "typescript": "^5.7",
+    "vitest": "^2"
   }
 }
