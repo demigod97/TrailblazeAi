@@ -48,13 +48,56 @@ pnpm --filter @trailblaze/api dev    # Fastify dev server (tsx watch)
 - **Components:** shadcn/ui (new-york style, radix-ui primitives)
 - **Formatting:** Prettier (default config)
 
-## BMAD Reference
+## BMAD V6 Protocol (MANDATORY)
 
-- Framework at `_bmad/` — agents, workflows, templates
-- Config: `_bmad/bmm/config.yaml`
-- Output: `_bmad-output/planning-artifacts/`
-- Workflow status: `_bmad-output/planning-artifacts/bmm-workflow-status.yaml`
-- Use `/bmad:bmm:workflows:workflow-status` to check current phase
+This project is governed by the BMAD V6 workflow framework. **All agents, tools, and AI assistants MUST follow these protocols.**
+
+### Phase Gate Enforcement
+
+The project follows 4 sequential phases. Never skip ahead:
+
+1. **Analysis** — Research, brainstorming, product brief
+2. **Planning** — PRD, UX design specification
+3. **Solutioning** — Architecture, epics & stories, implementation readiness check
+4. **Implementation** — Sprint planning, story execution, code review, retrospective
+
+Check current phase: `/bmad:bmm:workflows:workflow-status` or read `_bmad-output/planning-artifacts/bmm-workflow-status.yaml`
+
+### Activation Protocol
+
+Before starting any task:
+
+1. **Read workflow status** — `_bmad-output/planning-artifacts/bmm-workflow-status.yaml`
+2. **Load project context** — `_bmad-output/planning-artifacts/project-context.md`
+3. **Load architecture** — `_bmad-output/planning-artifacts/architecture.md`
+4. **Load config** — `_bmad/bmm/config.yaml` (project name, user, paths)
+
+### Implementation Rules (Phase 4 Only)
+
+1. **Story is single source of truth** — Only implement tasks/subtasks from the assigned story file. No scope creep.
+2. **Red-green-refactor** — Write failing test → implement to pass → refactor. This cycle is mandatory.
+3. **Honest completion** — Mark tasks `[x]` only when BOTH implementation AND tests pass. Never lie about test results.
+4. **Full test suite** — Run all tests after each task. Never proceed with failing tests.
+5. **Architecture compliance** — All code must follow patterns in `architecture.md`.
+
+### Code Review Protocol
+
+1. **Adversarial review** — Find 3-10 specific problems per review. NEVER accept "looks good."
+2. **Story compliance** — Verify implementation matches story acceptance criteria exactly.
+3. **Test verification** — Confirm tests exist and pass 100%. Never assume.
+
+### BMAD File Locations
+
+| Path | Purpose |
+|------|---------|
+| `_bmad/` | Framework — agents, workflows, templates |
+| `_bmad/bmm/config.yaml` | Project configuration |
+| `_bmad-output/planning-artifacts/` | All planning outputs |
+| `_bmad-output/planning-artifacts/bmm-workflow-status.yaml` | Current phase/status |
+| `_bmad-output/planning-artifacts/project-context.md` | Implementation rules |
+| `_bmad-output/planning-artifacts/architecture.md` | Architecture decisions |
+| `_bmad-output/planning-artifacts/PRD.md` | Product requirements |
+| `_bmad-output/planning-artifacts/ux-design-specification.md` | UX specification |
 
 ## Important Paths
 
@@ -68,6 +111,26 @@ pnpm --filter @trailblaze/api dev    # Fastify dev server (tsx watch)
 | `apps/api/src/config.ts` | Zod-validated environment config |
 | `packages/shared/src/types/trailhead.ts` | Domain type definitions |
 | `docker/docker-compose.yml` | Docker service definitions |
+
+## AI Tool Configurations
+
+| Directory | Tool | Purpose |
+|-----------|------|---------|
+| `.claude/` | Claude Code CLI | MCP servers, settings, skills, slash commands (BMAD V6) |
+| `.github/workflows/` | GitHub Actions | CI pipeline, Claude Code Action for PR review (uses Haiku for cost) |
+| `.github/agents/` | GitHub Copilot Agents | BMAD V6 agent personas for Copilot |
+| `.github/copilot/` | GitHub Copilot | Project-specific instructions for code completion |
+| `.agent/` | OpenAI Codex | Instructions and BMAD workflows for Codex |
+| `.gemini/` | Google Gemini CLI | Settings, instructions, BMAD commands |
+| `docs/guides/` | Developer Guides | Guides for each AI tool (Claude CLI, Web, Codex, Gemini, Copilot) |
+
+## Skills & MCP Servers
+
+- **Playwright MCP** — Browser automation for Trailhead interaction
+- **Supabase MCP** — Direct database operations
+- **Sequential Thinking MCP** — Complex multi-step reasoning
+- **Filesystem MCP** — File system operations
+- **Custom Skills** — `.claude/skills/trailhead-automation/` and `.claude/skills/code-quality/`
 
 ## Environment Variables
 

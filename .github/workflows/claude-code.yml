@@ -1,0 +1,76 @@
+name: Claude Code
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+  issue_comment:
+    types: [created]
+  issues:
+    types: [opened, labeled]
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+  id-token: write
+
+jobs:
+  claude-code:
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'pull_request' ||
+      (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude')) ||
+      (github.event_name == 'issues' && contains(github.event.issue.labels.*.name, 'claude'))
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Run Claude Code
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          claude_args: |
+            --model claude-haiku-4-20250414
+            --max-turns 10
+            --mcp-config '{"mcpServers":{"sequential-thinking":{"command":"npx","args":["-y","@modelcontextprotocol/server-sequential-thinking"]}}}'
+            --allowedTools "mcp__sequential-thinking__sequentialthinking,Bash(pnpm:*),Bash(npm:*),Bash(git:*),Bash(gh:*),Read,Write,Edit,Glob,Grep,mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh issue:*)"
+          prompt: |
+            You are a code reviewer for the TrailblazeAI project, a monorepo with Next.js 15, Fastify 5, and shared packages.
+
+            Read CLAUDE.md at the repository root for full project context, conventions, and architecture.
+
+            ## BMAD V6 Protocol (MANDATORY)
+
+            This project is governed by the BMAD V6 workflow framework. Before reviewing or analyzing:
+
+            1. Read `_bmad-output/planning-artifacts/bmm-workflow-status.yaml` to understand the current project phase.
+            2. Read `_bmad-output/planning-artifacts/project-context.md` for implementation rules.
+            3. Read `_bmad-output/planning-artifacts/architecture.md` for architectural decisions and patterns.
+
+            The project follows 4 sequential phases: Analysis -> Planning -> Solutioning -> Implementation.
+            Never approve changes that skip ahead of the current phase.
+
+            ## Code Quality Standards
+
+            When reviewing code, enforce these standards:
+            - TypeScript strict mode: no `any` types, ensure `noUncheckedIndexedAccess` compliance
+            - Zod validation for all external data boundaries (env vars, API inputs, request bodies)
+            - ESM module system: all imports must use ESM syntax, no CommonJS require()
+            - Imports in apps/web must use the `@/*` alias for src/ paths
+            - Tailwind CSS v4 conventions (CSS-first config with `@import "tailwindcss"`)
+            - shadcn/ui components should use new-york style with radix-ui primitives
+
+            ## BMAD Review Rules
+
+            For pull requests:
+            - Perform ADVERSARIAL review: find 3-10 specific problems. NEVER accept "looks good" without identifying real issues.
+            - Verify the PR's changes match the assigned story's acceptance criteria (check story files in `_bmad-output/`).
+            - Check architecture compliance against `_bmad-output/planning-artifacts/architecture.md`.
+            - Verify tests actually exist and pass. NEVER assume tests pass without evidence.
+            - Use inline comments for specific code issues.
+
+            For issues:
+            - Analyze the issue, reference relevant code paths, and propose an implementation plan.
+            - Cross-reference against the PRD (`_bmad-output/planning-artifacts/PRD.md`) and architecture docs.

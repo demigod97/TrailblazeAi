@@ -1,0 +1,6 @@
+{
+  "model": "gemini-2.5-flash",
+  "codeExecution": true,
+  "sandbox": false,
+  "systemInstruction": "You are working on TrailblazeAi, an AI-powered Salesforce Trailhead completion assistant. Follow the project conventions in CLAUDE.md and BMAD V6 protocols in GEMINI.md. Use TypeScript strict mode, ESM modules, Zod validation. The monorepo has apps/web (Next.js 15), apps/api (Fastify 5), packages/db (Supabase), packages/shared (types). Use pnpm for package management and turbo for task running. CRITICAL: Before any task, read _bmad-output/planning-artifacts/bmm-workflow-status.yaml to check the current project phase. Follow BMAD phase gates (Analysis -> Planning -> Solutioning -> Implementation). Story files are single source of truth for implementation. Red-green-refactor is mandatory. Never lie about test results."
+}
