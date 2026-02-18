@@ -37,24 +37,24 @@ story_location: "_bmad-output/implementation-artifacts"
 
 development_status:
   # Epic 1: Project Foundation & Trailmix Import
-  epic-1: backlog
-  1-1-api-foundation-and-docker-deployment: backlog
-  1-2-frontend-shell-and-authentication: backlog
-  1-3-trailmix-import-and-module-discovery: backlog
-  1-4-real-time-module-status-dashboard: backlog
+  epic-1: done
+  1-1-api-foundation-and-docker-deployment: done
+  1-2-frontend-shell-and-authentication: done
+  1-3-trailmix-import-and-module-discovery: done
+  1-4-real-time-module-status-dashboard: done
   epic-1-retrospective: optional
 
   # Epic 2: Content Extraction & Browser Automation
-  epic-2: backlog
-  2-1-playwright-mcp-integration-and-browser-session-management: backlog
-  2-2-unit-content-extraction-pipeline: backlog
-  2-3-pipeline-concurrency-and-retry-management: backlog
-  2-4-session-expiry-detection-and-recovery: backlog
+  epic-2: done
+  2-1-playwright-mcp-integration-and-browser-session-management: done
+  2-2-unit-content-extraction-pipeline: done
+  2-3-pipeline-concurrency-and-retry-management: done
+  2-4-session-expiry-detection-and-recovery: done
   epic-2-retrospective: optional
 
   # Epic 3: Knowledge Processing & Search
-  epic-3: backlog
-  3-1-content-chunking-with-salesforce-specific-rules: backlog
+  epic-3: in-progress
+  3-1-content-chunking-with-salesforce-specific-rules: in-progress
   3-2-embedding-generation-and-vector-storage: backlog
   3-3-concept-relationship-mapping: backlog
   3-4-hybrid-search-and-knowledge-api: backlog
