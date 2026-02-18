@@ -1,6 +1,6 @@
 FROM mcr.microsoft.com/playwright:v1.50.0-noble
 
-RUN corepack enable
+RUN npm install -g pnpm@9.15.4
 WORKDIR /app
 
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
