@@ -1,5 +1,5 @@
 ---
-stepsCompleted: [step-01-validate-prerequisites]
+stepsCompleted: [step-01-validate-prerequisites, step-02-design-epics]
 inputDocuments:
   - _bmad-output/planning-artifacts/prd.md
   - _bmad-output/planning-artifacts/architecture.md
@@ -139,8 +139,84 @@ NFR25: Aggregated metrics available: modules processed, quiz accuracy, chunks in
 
 ### FR Coverage Map
 
-{{requirements_coverage_map}}
+| FR | Epic | Description |
+|----|------|-------------|
+| FR1 | Epic 1 | Import Trailmix by URL |
+| FR2 | Epic 1 | Enumerate modules/units with metadata |
+| FR3 | Epic 2 | Navigate and extract unit content |
+| FR4 | Epic 2 | Maintain authenticated session with persistent profiles |
+| FR5 | Epic 2 | Detect session expiry and alert user |
+| FR6 | Epic 2 | Handle Shadow DOM via accessibility tree |
+| FR7 | Epic 2 | Extract quiz questions and answer options |
+| FR8 | Epic 3 | Structure-aware content chunking |
+| FR9 | Epic 3 | Vector embedding generation |
+| FR10 | Epic 3 | Knowledge storage with embeddings, FTS, metadata |
+| FR11 | Epic 3 | Content type tagging |
+| FR12 | Epic 3 | Salesforce entity extraction |
+| FR13 | Epic 3 | Hybrid search (vector + FTS + RRF) |
+| FR14 | Epic 3 | Filter by content type, topics, difficulty |
+| FR15 | Epic 3 | Top-k retrieval for quiz questions |
+| FR16 | Epic 4 | LLM-based relevance re-ranking |
+| FR17 | Epic 4 | Chain-of-thought quiz answering |
+| FR18 | Epic 4 | Confidence scoring (0.0-1.0) |
+| FR19 | Epic 4 | Answer submission via browser |
+| FR20 | Epic 4 | Result recording |
+| FR21 | Epic 4 | Low-confidence flagging for review |
+| FR22 | Epic 4 | Retry with additional context |
+| FR23 | Epic 2 | Job queue with priority ordering |
+| FR24 | Epic 2 | Concurrency limits (browser pages, API calls) |
+| FR25 | Epic 2 | Retry failed jobs with backoff |
+| FR26 | Epic 2 | Stage chaining (scrape → extract) |
+| FR27 | Epic 5 | Pipeline configuration |
+| FR28 | Epic 5 | Pause, resume, cancel runs |
+| FR29 | Epic 1 | Health status reporting |
+| FR30 | Epic 1 | Per-module processing status |
+| FR31 | Epic 5 | Aggregated progress reporting |
+| FR32 | Epic 5 | Agent action logging with cost tracking |
+| FR33 | Epic 1 | Docker container deployment |
+| FR34 | Epic 1 | REST API for status/results |
+| FR35 | Epic 3 | Semantic search via API |
+| FR36 | Epic 3 | Structured knowledge for AI agents |
+| FR37 | Epic 4 | Badge tracking |
 
 ## Epic List
 
-{{epics_list}}
+### Epic 1: Project Foundation & Trailmix Import
+
+Demi can deploy the system to VPS, access a secure dashboard, submit a Trailmix URL, and see all discovered modules listed with metadata and real-time status tracking.
+
+**FRs covered:** FR1, FR2, FR29, FR30, FR33, FR34
+
+**Infrastructure delivered:** Database schema (7 migrations), Fastify API with plugins (auth, error handler, pg-boss init, CORS, rate-limit), Docker 3-container stack, frontend shell (AppShell, Sidebar, Supabase Auth), dashboard with URL input, module list, stat cards, filter chips, Supabase Realtime for module status.
+
+### Epic 2: Content Extraction & Browser Automation
+
+Demi can trigger automated content extraction from discovered modules and watch real-time progress as the scraper navigates Trailhead pages, extracts content (text, code, quizzes), and handles session management with persistent browser profiles.
+
+**FRs covered:** FR3, FR4, FR5, FR6, FR7, FR23, FR24, FR25, FR26
+
+**Key capabilities:** Playwright MCP browser automation with accessibility tree snapshots, Stagehand v3 fallback for Shadow DOM edge cases, persistent browser profiles for Salesforce session management, session expiry detection and user alert flow, pg-boss queue management with scrape → extract stage chaining, concurrency limits (max 2 browser pages) and retry with backoff, real-time scraping progress visible in dashboard.
+
+### Epic 3: Knowledge Processing & Search
+
+Demi can see extracted content transformed into a searchable Salesforce knowledge base — chunked, embedded, tagged with concepts and entities — and search it via hybrid search with filtering and concept relationships.
+
+**FRs covered:** FR8, FR9, FR10, FR11, FR12, FR13, FR14, FR15, FR35, FR36
+
+**Key capabilities:** ChonkieJS + custom Trailhead chunking rules, OpenAI text-embedding-3-small via AI SDK embedMany(), Salesforce entity extraction, hybrid search SQL function with RRF re-ranking, knowledge base UI with search, filtering, and concept relationships, Cmd+K omnibar for global search, structured knowledge API for AI coding agents.
+
+### Epic 4: Quiz Automation & Review
+
+Demi can review AI-generated quiz answers with confidence scores and chain-of-thought reasoning, approve or edit answers, submit them to Trailhead via browser automation, and track badge completion across all modules.
+
+**FRs covered:** FR16, FR17, FR18, FR19, FR20, FR21, FR22, FR37
+
+**Key capabilities:** Quiz Agent with Claude Sonnet chain-of-thought reasoning, LLM-based relevance re-ranking, confidence scoring (0.0-1.0) with color-coded bars, Review Panel with approve/edit workflow, low-confidence flagging for manual review, retry with additional context, browser-based answer submission, badge tracking.
+
+### Epic 5: Pipeline Operations & Monitoring
+
+Demi can configure pipeline behavior (priority tracks, quiz-only mode), pause/resume/cancel processing runs, monitor system health and agent costs, and manage multi-day unattended runs with full operational visibility.
+
+**FRs covered:** FR27, FR28, FR31, FR32
+
+**Key capabilities:** Pipeline configuration UI (priority track, quiz-only mode, skip-completed), pause/resume/cancel controls, aggregated progress reporting, agent action logging with ToolTrace pattern, Settings page with system health, concurrency controls, cost tracking.
