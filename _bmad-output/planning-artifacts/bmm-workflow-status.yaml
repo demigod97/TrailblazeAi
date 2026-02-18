@@ -63,10 +63,10 @@ workflow_status:
     note: "Complete - 8-step workflow: 15 decisions, 23 patterns, full project structure, validation passed. Ready for implementation."
 
   create-epics-and-stories:
-    status: "required"
+    status: "_bmad-output/planning-artifacts/epics.md"
     agent: "pm"
     command: "/bmad:bmm:workflows:create-epics-and-stories"
-    note: "Break down PRD into implementable epics and stories"
+    note: "Complete - 4-step workflow: 5 epics, 18 stories, 37/37 FRs covered, all validations passed. Ready for implementation readiness check."
 
   test-design:
     status: "optional"
