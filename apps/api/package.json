@@ -10,7 +10,7 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
-    "@ai-sdk/anthropic": "^2",
+    "@ai-sdk/anthropic": "^3",
     "@ai-sdk/mcp": "^0",
     "@fastify/bearer-auth": "^10",
     "@fastify/cors": "^11",
