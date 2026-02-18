@@ -619,3 +619,115 @@ So that I can explore Salesforce knowledge efficiently.
 **Given** the knowledge base has no content
 **When** the Knowledge Base page loads
 **Then** I see: "Process some Trailhead modules to build your knowledge base."
+
+## Epic 4: Quiz Automation & Review
+
+Demi can review AI-generated quiz answers with confidence scores and chain-of-thought reasoning, approve or edit answers, submit them to Trailhead via browser automation, and track badge completion across all modules.
+
+### Story 4.1: Quiz Agent with Chain-of-Thought Reasoning
+
+As a user,
+I want the system to analyze quiz questions using AI with chain-of-thought reasoning and confidence scoring,
+So that answers are accurate and transparent.
+
+**Acceptance Criteria:**
+
+**Given** a module has status "ready" with quiz items stored
+**When** the answer-quiz job is processed
+**Then** the Quiz Agent (Claude Sonnet) retrieves relevant context via hybrid search for each question
+**And** LLM-based relevance re-ranking selects the most pertinent chunks for high-stakes quiz context
+
+**Given** the Quiz Agent analyzes a question
+**When** it generates an answer
+**Then** it uses chain-of-thought reasoning: restates the question, evaluates each option against retrieved context, and selects the best answer
+**And** a confidence score (0.0-1.0) is assigned based on context coverage and answer certainty
+**And** the full reasoning chain is preserved for user review
+
+**Given** quiz results are generated
+**When** they are stored in the quiz_results table
+**Then** each result includes: quiz_item_id, selected_answer, correct_answer (null until verified), confidence, reasoning text, and attempt_number
+**And** the module status transitions from "ready" to "quizzing"
+
+**Given** the answer-quiz queue is configured
+**When** multiple quiz jobs are queued
+**Then** quiz-ready modules get priority=1 (highest) so users see results faster
+**And** up to 3 quiz jobs run concurrently with 2 retries and exponential backoff
+**And** prompts are loaded from apps/api/src/prompts/quiz-agent.yaml
+
+**Given** the confidence score is below the configurable threshold (default 0.7)
+**When** the initial answer is generated
+**Then** the system retries with additional context: broader search scope, related concept chunks, and explicit instruction to reconsider
+**And** the retry result replaces the original only if its confidence is higher
+
+### Story 4.2: Quiz Review Panel with Approve/Edit Workflow
+
+As a user,
+I want to review AI-generated quiz answers in a persistent panel with confidence bars, and approve or edit them before submission,
+So that I maintain control over answer quality.
+
+**Acceptance Criteria:**
+
+**Given** quiz results exist for one or more modules
+**When** the dashboard loads
+**Then** the ReviewPanel slides in from the right (200ms ease transition, 340px width)
+**And** the panel shows the current module name and question count (e.g., "Module Name — 3/5 reviewed")
+
+**Given** I am viewing a quiz question in the ReviewPanel
+**When** the question renders
+**Then** I see: the question text, the AI-selected answer highlighted, the confidence bar, and the reasoning summary
+**And** the ConfidenceBar shows color ranges: green (>=90%), amber (70-89%), red (<70%)
+**And** answers below the threshold display a "Low confidence — review carefully" label
+
+**Given** I am reviewing an answer
+**When** I click "Approve" (or press Enter)
+**Then** the answer is marked as approved and the panel advances to the next question
+**And** the progress counter updates (e.g., "4/5 reviewed")
+
+**Given** I disagree with the AI's answer
+**When** I click "Edit" (or press E)
+**Then** the answer options become selectable and I can choose a different answer
+**And** I can optionally add a note explaining my override
+**And** pressing Save confirms the edit, Cancel reverts
+
+**Given** all quiz answers for a module have been reviewed
+**When** the last answer is approved or edited
+**Then** the module shows "Ready to submit" status
+**And** the ReviewPanel shows the next module with pending reviews, or collapses if none remain
+
+**Given** no modules have quiz results pending review
+**When** the dashboard loads
+**Then** the ReviewPanel remains collapsed (hidden) and the center column expands to fill the space
+
+### Story 4.3: Answer Submission & Badge Tracking
+
+As a user,
+I want approved answers submitted to Trailhead and badges tracked automatically,
+So that completing quizzes earns badges and results are recorded.
+
+**Acceptance Criteria:**
+
+**Given** all quiz answers for a module are approved
+**When** I click "Submit to Trailhead" (or the system auto-submits high-confidence approved answers)
+**Then** the Scraper Agent navigates to the quiz page via Playwright MCP and submits each answer
+**And** the module status transitions from "quizzing" to "completed" on success
+
+**Given** an answer is submitted
+**When** Trailhead returns the result
+**Then** the quiz_results record is updated with: correct_answer (from Trailhead feedback), whether selected_answer matches, and the attempt_number
+**And** if the answer was wrong, the question is flagged for retry with additional context
+
+**Given** all quizzes for a module are passed
+**When** the badge is earned
+**Then** the module record is updated with badge_url and badge_earned=true
+**And** a success toast appears: "Badge earned: [Module Name]" (3s duration)
+**And** the hero stat card for "badges earned" increments
+
+**Given** a quiz submission fails (network error, page timeout)
+**When** the submission encounters an error
+**Then** the system retries up to 2 times with backoff
+**And** the module status remains "quizzing" with the failed question highlighted in the ReviewPanel
+
+**Given** I want to track overall badge progress
+**When** I view the dashboard
+**Then** I can see which modules have earned badges vs. which are pending
+**And** GET /api/quiz-results returns all results with filtering by module_id and correct status
