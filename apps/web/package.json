@@ -11,7 +11,7 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
-    "@ai-sdk/anthropic": "^2",
+    "@ai-sdk/anthropic": "^3",
     "@supabase/ssr": "^0.5",
     "@supabase/supabase-js": "^2.49",
     "@trailblaze/db": "workspace:*",
