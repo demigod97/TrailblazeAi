@@ -21,7 +21,7 @@ You should only be called for:
 1. Read the problem statement from the task description
 2. Read the relevant story file
 3. Read `_bmad-output/planning-artifacts/architecture.md` — focus on the 15 architecture decisions and 23 patterns
-4. Read `_bmad-output/planning-artifacts/prd.md` if requirements context is needed
+4. Read `_bmad-output/planning-artifacts/PRD.md` if requirements context is needed
 
 ### Step 2: Analyze
 1. Identify which architecture decisions are relevant

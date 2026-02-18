@@ -21,7 +21,7 @@ Read these files completely:
 
 1. `_bmad-output/planning-artifacts/epics.md` — Primary source: all epics and stories with acceptance criteria
 2. `_bmad-output/planning-artifacts/architecture.md` — Extract key decisions summary
-3. `_bmad-output/planning-artifacts/implementation-readiness-report-2026-02-18.md` — Verify READY status
+3. The most recent `_bmad-output/planning-artifacts/implementation-readiness-report-*.md` — Verify READY status (use glob to find latest; there may be multiple dated files — read the most recently modified one)
 4. `_bmad-output/project-context.md` — Technology stack and conventions
 
 ## Plan Generation Rules
@@ -59,7 +59,7 @@ Assign based on story complexity:
 Map dependencies based on the epic structure and acceptance criteria:
 
 **Epic 1 (sequential):** 1.1 → 1.2 → 1.3 → 1.4
-**Epic 2:** 2.1 → {2.2, 2.3, 2.4} (2.2/2.3/2.4 can run in parallel after 2.1)
+**Epic 2:** 2.1 → {2.2, 2.3, 2.4} (2.2/2.3/2.4 depend only on 2.1; ralph-run executes serially for safety — one story at a time)
 **Epic 3 (sequential):** 3.1 → 3.2 → 3.3 → 3.4 → 3.5
 **Epic 4 (sequential):** 4.1 → 4.2 → 4.3
 **Epic 5 (sequential):** 5.1 → 5.2
@@ -72,7 +72,7 @@ Map dependencies based on the epic structure and acceptance criteria:
 
 ## Output: .ralph-plan.md
 
-Write the file to the project root (`/home/user/TrailblazeAi/.ralph-plan.md`):
+Write the file to the project root (`.ralph-plan.md`):
 
 ```markdown
 # Ralph Implementation Plan — TrailBlazeAI
@@ -140,6 +140,8 @@ Total Epics: 5
 4. **Full test suite** — Run all tests after each task, never proceed with failing tests
 5. **Architecture compliance** — All code follows patterns in architecture.md
 6. **Adversarial review** — Reviewer must find 3-10 issues minimum per story
+7. **No scope creep** — Never implement outside assigned story tasks
+8. **No `any` types** — Use `unknown` + Zod parsing or type narrowing
 
 ## Status Legend
 

@@ -121,6 +121,14 @@ After all tasks in the story are marked `[x]`:
    - Log details in `.ralph-progress.md`
    - Move to next story
 
+### Per-Story Iteration Cap
+
+Track `total_cycles` per story in `.ralph-progress.md` (IMPLEMENT + QA + REVIEW iterations combined). If `total_cycles > 10`:
+- Mark story `[!]` with reason "Exceeded iteration cap (10)"
+- Log all attempted approaches in `.ralph-progress.md`
+- Move to next eligible story
+- This prevents runaway loops caused by environment issues, flaky tests, or ambiguous requirements
+
 ---
 
 ## REVIEW Phase
@@ -131,11 +139,10 @@ After QA passes:
 
 2. **Process review findings:**
 
-   **If verdict is APPROVE (with issues noted):**
-   - Fix any CRITICAL issues immediately (these are non-negotiable)
-   - Fix HIGH issues if straightforward
-   - Log MEDIUM/LOW issues for follow-up
-   - Update story status to "done"
+   **If verdict is APPROVE:**
+   - APPROVE means no CRITICAL or blocking issues — only MEDIUM/LOW findings
+   - Log any MEDIUM/LOW deferred issues in `.ralph-progress.md`
+   - Update story status to "done" and proceed to COMMIT
 
    **If verdict is CHANGES_REQUESTED:**
    - Return to IMPLEMENT phase with review findings
@@ -158,7 +165,12 @@ After story passes review:
    - `.ralph-plan.md`: change `[~]` to `[x]`
    - `sprint-status.yaml`: story status → `done`
 
-2. **Update `.ralph-progress.md`:**
+2. **Update epic status in `sprint-status.yaml` if applicable:**
+   - Determine which epic the completed story belongs to (from its key prefix, e.g., `1-x` → epic-1)
+   - Check if ALL stories in that epic are now `[x]` in `.ralph-plan.md`
+   - If yes: update `epic-{N}: in-progress` → `epic-{N}: done` in `sprint-status.yaml`
+
+3. **Update `.ralph-progress.md`:**
    ```markdown
    ## [Story Key]: COMPLETE
    - Completed: [current timestamp]
@@ -171,7 +183,7 @@ After story passes review:
    - Architect escalations: [count]
    ```
 
-3. **Return to ORIENT phase** for next story
+4. **Return to ORIENT phase** for next story
 
 ---
 

@@ -73,12 +73,11 @@ Examine the actual code changes for:
 
 ### Step 6: Issue Compilation
 
-**Minimum 3 issues required.** If you found fewer than 3, look harder:
-- Check edge cases in business logic
-- Look for missing error handling
-- Verify all API response shapes match the envelope pattern
-- Check for hardcoded values that should be configurable
-- Look for missing TypeScript types or loose typing
+**Aim to find 3-10 real issues.** If you found fewer than 3, explicitly document your thorough search — do NOT manufacture issues:
+- State which edge cases you checked and found acceptable
+- Confirm each architecture compliance item was verified
+- If genuinely clean: report `CRITICAL: 0 | HIGH: 0 | MEDIUM: [N] | LOW: [N]` honestly
+- Minimum 3 real issues is a quality signal for typical stories, not an override for honest reporting
 
 ## Output Format
 
