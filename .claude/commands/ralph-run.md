@@ -25,12 +25,22 @@ If sprint-status.yaml does NOT exist, sprint planning must run first. Report thi
 2. If the selected story is currently `[~]` (in progress), resume where it left off using `.ralph-progress.md`
 
 3. Check if a story file exists at `_bmad-output/implementation-artifacts/{story-key}.md`:
-   - If **NO**: Create the story file. Read the story from `_bmad-output/planning-artifacts/epics.md`, extract the relevant story section (acceptance criteria, description), and create a story implementation file at `_bmad-output/implementation-artifacts/{story-key}.md` with:
-     - Story title and description
-     - All acceptance criteria (copied from epics.md)
-     - Task breakdown (derive from acceptance criteria — each AC becomes 1-2 tasks)
-     - Empty File List section
-     - Empty Dev Agent Record section
+   - If **NO**: Generate the comprehensive story file using the **BMAD create-story workflow**.
+     - Extract the story's epic number and story number from the story key (e.g., `1-1` from `1-1-api-foundation-and-docker-deployment`)
+     - Run the BMAD create-story workflow by invoking `/bmad:bmm:workflows:create-story` with the story identifier (e.g., "1-1" or "1.1")
+     - The workflow will:
+       1. Read epics.md for the story's acceptance criteria and description
+       2. Analyze architecture.md for relevant patterns and constraints
+       3. Read project-context.md for coding standards
+       4. Read UX design spec for UI-related stories
+       5. Analyze previous story files for learnings and patterns to carry forward
+       6. Check git history for recently established code patterns
+       7. Generate a task/subtask breakdown with checkboxes derived from ACs
+       8. Include architecture compliance notes with specific file paths
+       9. Include dev notes referencing existing code to reuse/extend
+       10. Set status to "ready-for-dev" and update sprint-status.yaml
+     - This comprehensive story file is **critical for Haiku** (ralph-implementer) — without it, the agent lacks file path guidance, architecture context, and task granularity needed for correct implementation
+     - Story files are created one-at-a-time so each story incorporates learnings from previous completed stories
    - If **YES**: Read the story file to find the next incomplete task
 
 4. Mark the story as `[~]` in `.ralph-plan.md`
