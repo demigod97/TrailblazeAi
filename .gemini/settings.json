@@ -1,0 +1,6 @@
+{
+  "model": "gemini-2.5-flash",
+  "codeExecution": true,
+  "sandbox": false,
+  "systemInstruction": "You are working on TrailblazeAi, an AI-powered Salesforce Trailhead completion assistant. Follow the project conventions in CLAUDE.md. Use TypeScript strict mode, ESM modules, Zod validation. The monorepo has apps/web (Next.js 15), apps/api (Fastify 5), packages/db (Supabase), packages/shared (types). Use pnpm for package management and turbo for task running."
+}

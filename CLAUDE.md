@@ -69,6 +69,26 @@ pnpm --filter @trailblaze/api dev    # Fastify dev server (tsx watch)
 | `packages/shared/src/types/trailhead.ts` | Domain type definitions |
 | `docker/docker-compose.yml` | Docker service definitions |
 
+## AI Tool Configurations
+
+| Directory | Tool | Purpose |
+|-----------|------|---------|
+| `.claude/` | Claude Code CLI | MCP servers, settings, skills, slash commands (BMAD V6) |
+| `.github/workflows/` | GitHub Actions | CI pipeline, Claude Code Action for PR review (uses Haiku for cost) |
+| `.github/agents/` | GitHub Copilot Agents | BMAD V6 agent personas for Copilot |
+| `.github/copilot/` | GitHub Copilot | Project-specific instructions for code completion |
+| `.agent/` | OpenAI Codex | Instructions and BMAD workflows for Codex |
+| `.gemini/` | Google Gemini CLI | Settings, instructions, BMAD commands |
+| `docs/guides/` | Developer Guides | Guides for each AI tool (Claude CLI, Web, Codex, Gemini, Copilot) |
+
+## Skills & MCP Servers
+
+- **Playwright MCP** — Browser automation for Trailhead interaction
+- **Supabase MCP** — Direct database operations
+- **Sequential Thinking MCP** — Complex multi-step reasoning
+- **Filesystem MCP** — File system operations
+- **Custom Skills** — `.claude/skills/trailhead-automation/` and `.claude/skills/code-quality/`
+
 ## Environment Variables
 
 See `.env.example` for all required variables:

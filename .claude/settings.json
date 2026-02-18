@@ -1,0 +1,36 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm:*)",
+      "Bash(pnpm:*)",
+      "Bash(npx:*)",
+      "Bash(turbo:*)",
+      "Bash(git:*)",
+      "Bash(gh:*)",
+      "Bash(docker:*)",
+      "Bash(docker-compose:*)",
+      "Bash(node:*)",
+      "Bash(tsx:*)",
+      "Bash(tsc:*)",
+      "Bash(prettier:*)",
+      "Bash(eslint:*)",
+      "Read",
+      "Write",
+      "Edit",
+      "Glob",
+      "Grep",
+      "WebFetch",
+      "mcp__playwright__*",
+      "mcp__supabase__*"
+    ],
+    "deny": [
+      "Bash(rm -rf /)",
+      "Bash(sudo:*)",
+      "Bash(curl|wget:*bash*)"
+    ]
+  },
+  "env": {
+    "NODE_ENV": "development",
+    "TURBO_TELEMETRY_DISABLED": "1"
+  }
+}
