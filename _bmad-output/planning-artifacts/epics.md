@@ -473,3 +473,149 @@ So that the pipeline can resume after I log back in.
 **When** the pipeline has been paused due to expired session
 **Then** all non-session-related modules continue processing (embedding, chunking)
 **And** only scraping jobs that require browser access are paused
+
+## Epic 3: Knowledge Processing & Search
+
+Demi can see extracted content transformed into a searchable Salesforce knowledge base — chunked, embedded, tagged with concepts and entities — and search it via hybrid search with filtering and concept relationships.
+
+### Story 3.1: Content Chunking with Salesforce-Specific Rules
+
+As a user,
+I want extracted content chunked into structure-aware segments with Salesforce-specific tagging,
+So that knowledge is organized for accurate retrieval.
+
+**Acceptance Criteria:**
+
+**Given** a unit has extracted content in markdown format
+**When** the identify-concepts stage processes it
+**Then** the Knowledge Agent (Claude Haiku) extracts Salesforce-specific concepts: object names, API names, Apex keywords, Flow references
+**And** the output is validated with a Zod schema (one retry on validation failure)
+**And** prompts are loaded from apps/api/src/prompts/knowledge-agent.yaml
+
+**Given** structured content is ready for chunking
+**When** the chunk-content stage processes it
+**Then** ChonkieJS splits content into 400-512 token segments with 50-100 token overlap
+**And** code blocks are kept intact as separate chunks (never split mid-block)
+**And** quiz questions are atomic: one question + all options = one chunk with content_type "quiz"
+**And** hands-on steps are grouped together (~800 tokens) with content_type "hands_on"
+
+**Given** chunks are created
+**When** they are stored in sf_knowledge_chunks
+**Then** each chunk includes: content, content_type (explanation, code, quiz, hands_on, reference, definition), difficulty level, sf_topics array, unit_id foreign key, and section header metadata
+
+**Given** the pipeline processes a unit
+**When** identify-concepts and chunk-content stages complete
+**Then** pg-boss chains to the next stage (generate-embeddings)
+
+### Story 3.2: Embedding Generation & Vector Storage
+
+As a user,
+I want knowledge chunks embedded and stored with vector indexes,
+So that semantic search can find relevant content.
+
+**Acceptance Criteria:**
+
+**Given** knowledge chunks exist in sf_knowledge_chunks without embeddings
+**When** the generate-embeddings stage processes a batch
+**Then** AI SDK embedMany() calls OpenAI text-embedding-3-small with maxParallelCalls: 5 and maxRetries: 3
+**And** each chunk receives a 1536-dimension embedding vector
+
+**Given** embeddings are generated
+**When** they are stored in sf_knowledge_chunks
+**Then** the embedding column is populated
+**And** a full-text search tsvector column (fts) is generated from the chunk content
+**And** token usage is tracked in agent logs
+
+**Given** the knowledge base grows
+**When** 100+ chunks are stored
+**Then** an HNSW index (m=16, ef_construction=64) on the embedding column provides fast vector similarity search
+**And** a GIN index on the fts column provides fast full-text search
+
+**Given** the generate-embeddings queue is configured
+**When** multiple embedding jobs are queued
+**Then** up to 5 run concurrently with 3 retries and exponential backoff on 429 rate limit errors
+
+**Given** all chunks for a module are embedded
+**When** the embedding stage completes
+**Then** pg-boss chains to build-relationships stage
+
+### Story 3.3: Concept Relationship Mapping
+
+As a user,
+I want the system to map concept dependencies between Salesforce topics,
+So that cross-module knowledge connections are discoverable.
+
+**Acceptance Criteria:**
+
+**Given** a module's concepts have been identified
+**When** the build-relationships stage processes them
+**Then** the Knowledge Agent (Claude Haiku) maps concept dependencies with relationship types: prerequisite, related_to, part_of
+**And** relationships are stored in sf_concept_relationships table with source_concept, target_concept, and relationship_type
+
+**Given** relationships span multiple modules
+**When** a concept from Module A relates to a concept from Module B
+**Then** the cross-module relationship is stored and discoverable
+
+**Given** the build-relationships stage completes for a module
+**When** all pipeline stages are finished
+**Then** the module status transitions to "ready" (available for quiz answering or knowledge search)
+
+### Story 3.4: Hybrid Search & Knowledge API
+
+As a user,
+I want to search the knowledge base using hybrid search with filtering,
+So that I can find relevant Salesforce information quickly.
+
+**Acceptance Criteria:**
+
+**Given** the hybrid_search() SQL function is deployed
+**When** I call it with query text and a query embedding
+**Then** it combines vector similarity and full-text search using RRF re-ranking with full_text_weight=1.5 and semantic_weight=1.0
+**And** returns the top-k most relevant chunks ordered by combined score
+
+**Given** I call GET /api/knowledge/search with query parameters
+**When** the request includes ?q=query_text and optional filters (?content_type=, ?sf_topics=, ?difficulty=, ?module_name=)
+**Then** the API generates an embedding for the query, calls hybrid_search(), applies filters, and returns results within 2 seconds
+**And** the response follows the ApiResponse envelope with paginated results
+
+**Given** search results are returned
+**When** the response is consumed by an AI coding agent
+**Then** each result includes: chunk content, content_type, sf_topics, source module name, unit title, relevance score, and related_chunk_ids
+
+**Given** no results match the query
+**When** the search returns empty
+**Then** the API returns an empty array (never null) with count: 0
+
+### Story 3.5: Knowledge Base UI with Global Search
+
+As a user,
+I want to browse and search the knowledge base with a split-panel UI and Cmd+K omnibar,
+So that I can explore Salesforce knowledge efficiently.
+
+**Acceptance Criteria:**
+
+**Given** I navigate to the Knowledge Base page
+**When** the page loads
+**Then** I see a split-panel layout: search results on the left, detail panel on the right
+**And** the search input is focused by default
+
+**Given** I type a query in the search input
+**When** 300ms have passed since the last keystroke (debounced)
+**Then** hybrid search results appear in the left panel
+**And** each result shows: chunk title, source module name, content type icon, relevance score (monospace, muted), and a content preview snippet
+
+**Given** I click a search result
+**When** the detail panel loads
+**Then** I see the full chunk content with metadata (module, unit, content type, difficulty, sf_topics)
+**And** related concepts are linked at the bottom of the detail view
+**And** clicking a related concept navigates to that knowledge entry
+
+**Given** I am on any page
+**When** I press Cmd+K (or Ctrl+K)
+**Then** the Command dialog opens (shadcn Command component)
+**And** I can search across modules, knowledge entries, and navigation actions
+**And** results are navigable via arrow keys, Enter to select, Escape to close
+
+**Given** the knowledge base has no content
+**When** the Knowledge Base page loads
+**Then** I see: "Process some Trailhead modules to build your knowledge base."
