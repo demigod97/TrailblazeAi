@@ -13,7 +13,7 @@
     "gen-types": "supabase gen types typescript --project-id $SUPABASE_PROJECT_ID > src/types.ts"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.96"
+    "@supabase/supabase-js": "^2.97"
   },
   "devDependencies": {
     "supabase": "^2",

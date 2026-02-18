@@ -14,7 +14,7 @@
   "dependencies": {
     "@ai-sdk/anthropic": "^3",
     "@supabase/ssr": "^0.5",
-    "@supabase/supabase-js": "^2.96",
+    "@supabase/supabase-js": "^2.97",
     "@trailblaze/db": "workspace:*",
     "@trailblaze/shared": "workspace:*",
     "ai": "^6",
