@@ -355,3 +355,121 @@ So that I can monitor progress at a glance without refreshing.
 **Given** all modules are in "pending" state
 **When** I view the module list
 **Then** modules are sorted: quiz-ready first, then active, then queued, then completed (faded at opacity 0.6)
+
+## Epic 2: Content Extraction & Browser Automation
+
+Demi can trigger automated content extraction from discovered modules and watch real-time progress as the scraper navigates Trailhead pages, extracts content (text, code, quizzes), and handles session management with persistent browser profiles.
+
+### Story 2.1: Playwright MCP Integration & Browser Session Management
+
+As a user,
+I want the system to maintain an authenticated Trailhead session using persistent browser profiles,
+So that content extraction works across multiple runs without re-authentication.
+
+**Acceptance Criteria:**
+
+**Given** the Worker container has Playwright MCP installed
+**When** the MCP client is initialized
+**Then** it connects via stdio transport with the persistent browser profile at /data/playwright-profiles/
+**And** the profile is stored in a Docker volume that survives container restarts
+
+**Given** a persistent browser profile exists with a valid Trailhead session
+**When** the system checks session validity via browser_snapshot on a known Trailhead page
+**Then** it confirms the session is active and proceeds with scraping
+
+**Given** the browser encounters dynamic content with Shadow DOM / LWC
+**When** the system needs to interact with the page
+**Then** it uses accessibility tree snapshots (getByRole, getByLabel, :has-text()) instead of CSS selectors
+
+**Given** Playwright MCP fails to extract content from a specific page
+**When** the accessibility tree approach returns incomplete data
+**Then** Stagehand v3 fallback is invoked with a Zod schema for structured extraction
+**And** the fallback result is logged with tool_type "stagehand" in agent logs
+
+### Story 2.2: Unit Content Extraction Pipeline
+
+As a user,
+I want the system to automatically navigate to Trailhead unit pages and extract full content,
+So that module content is captured for knowledge processing.
+
+**Acceptance Criteria:**
+
+**Given** a module has status "pending" and a scrape job is queued
+**When** the Scraper Agent processes the job
+**Then** it navigates to each unit page via Playwright MCP and extracts: text content, code blocks, quiz questions with options, and learning objectives
+**And** the module status transitions from "pending" to "scraping" to "scraped"
+
+**Given** raw HTML is extracted from a unit page
+**When** the extract-content stage processes it
+**Then** the HTML is parsed into structured sections: headers, explanatory text, code blocks (preserved intact), and quiz items
+**And** content is stored as markdown in the units table with content_markdown column
+
+**Given** a unit contains quiz questions
+**When** the extraction completes
+**Then** each question is stored in the quiz_items table with: question text, answer options, and submission control identifiers
+
+**Given** a scrape job completes successfully
+**When** all units in the module are scraped
+**Then** pg-boss automatically chains to the extract-content queue for the next pipeline stage
+**And** the Scraper Agent prompts are loaded from apps/api/src/prompts/scraper-agent.yaml
+
+**Given** the system is scraping modules
+**When** human-like delays are applied
+**Then** 2-5 seconds elapse between page navigations to maintain account safety
+
+### Story 2.3: Pipeline Concurrency & Retry Management
+
+As a user,
+I want the system to enforce concurrency limits and retry failed jobs automatically,
+So that the VPS isn't overwhelmed and transient failures are handled gracefully.
+
+**Acceptance Criteria:**
+
+**Given** the scrape-module queue is configured
+**When** multiple scrape jobs are queued
+**Then** a maximum of 2 jobs run concurrently (matching the 2-browser-page VPS limit)
+**And** the extract-content queue allows up to 5 concurrent jobs
+
+**Given** a scrape job fails due to a transient error (timeout, network issue)
+**When** the retry limit has not been reached
+**Then** the job retries with exponential backoff (up to 3 retries for scrape, 2 for extract)
+**And** the module's retry count increments and is visible on the module row
+
+**Given** a job has exhausted all retries
+**When** it enters dead letter state
+**Then** the module status transitions to "failed"
+**And** the module row shows an error badge with "Failed (attempt 3/3)" and a "Retry" button
+**And** the job is moved to dead-letter-scrape-module queue
+
+**Given** pg-boss queues are initialized
+**When** the API starts
+**Then** queues are created with stage-specific configuration: scrape-module (retryLimit: 3, retryBackoff: true, expireInHours: 1), extract-content (retryLimit: 2, retryBackoff: true, expireInHours: 0.5)
+
+### Story 2.4: Session Expiry Detection & Recovery
+
+As a user,
+I want the system to detect expired Trailhead sessions and alert me for re-authentication,
+So that the pipeline can resume after I log back in.
+
+**Acceptance Criteria:**
+
+**Given** the scraper navigates to a Trailhead page
+**When** the page redirects to a Salesforce login page
+**Then** the system detects the session expiry via URL pattern matching
+
+**Given** session expiry is detected
+**When** the scraper agent recognizes the login redirect
+**Then** all in-progress scrape jobs are paused
+**And** the module status is set to "failed" with reason "session_expired"
+**And** a warning toast appears on the frontend: "Session expired — re-authenticate" (persistent until dismissed)
+
+**Given** I have re-authenticated by logging into Trailhead manually through the persistent browser profile
+**When** I click "Retry" on the failed modules
+**Then** the system validates the new session via browser_snapshot
+**And** failed modules with reason "session_expired" are re-queued for scraping
+**And** module status transitions back to "pending"
+
+**Given** session expiry occurs during an overnight run
+**When** the pipeline has been paused due to expired session
+**Then** all non-session-related modules continue processing (embedding, chunking)
+**And** only scraping jobs that require browser access are paused
