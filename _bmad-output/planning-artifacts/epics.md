@@ -220,3 +220,138 @@ Demi can configure pipeline behavior (priority tracks, quiz-only mode), pause/re
 **FRs covered:** FR27, FR28, FR31, FR32
 
 **Key capabilities:** Pipeline configuration UI (priority track, quiz-only mode, skip-completed), pause/resume/cancel controls, aggregated progress reporting, agent action logging with ToolTrace pattern, Settings page with system health, concurrency controls, cost tracking.
+
+## Epic 1: Project Foundation & Trailmix Import
+
+Demi can deploy the system to VPS, access a secure dashboard, submit a Trailmix URL, and see all discovered modules listed with metadata and real-time status tracking.
+
+### Story 1.1: API Foundation & Docker Deployment
+
+As a developer,
+I want the Fastify API and Worker deployed as Docker containers with health monitoring,
+So that the backend infrastructure is operational and verifiable.
+
+**Acceptance Criteria:**
+
+**Given** the Docker Compose file defines API (512MB), Worker (3GB), and Nginx containers
+**When** I run `docker compose up -d --build`
+**Then** all three containers start successfully with resource limits enforced
+**And** the Nginx reverse proxy routes `/api/*` to the Fastify server with SSL termination
+
+**Given** the Fastify API is running
+**When** I send GET /health
+**Then** I receive a 200 response within 500ms showing status of API, database connection, and pg-boss queue
+**And** the response follows the ApiResponse envelope format with snake_case fields
+
+**Given** the API receives a request without a valid Bearer token
+**When** the request targets any endpoint except /health
+**Then** the API returns 401 with an ApiError response
+
+**Given** the API encounters an error
+**When** the error is an AppError subclass (NotFoundError, ValidationError, PipelineError)
+**Then** the global error handler returns the correct HTTP status code and structured ApiError response
+
+**Given** environment variables are defined in .env
+**When** the API starts
+**Then** all required variables are validated with Zod schemas and the server fails fast with descriptive errors if validation fails
+
+### Story 1.2: Frontend Shell & Authentication
+
+As a user,
+I want to log into a secure dashboard with a responsive three-column layout,
+So that I have a private workspace for monitoring automation.
+
+**Acceptance Criteria:**
+
+**Given** I am not authenticated
+**When** I navigate to the dashboard
+**Then** I am redirected to the login page
+
+**Given** I am on the login page
+**When** I enter valid email and password
+**Then** I am authenticated via Supabase Auth and redirected to the dashboard
+**And** the middleware uses getClaims() for session validation (no network round-trip)
+
+**Given** I am authenticated
+**When** the dashboard loads
+**Then** I see a three-column layout: sidebar (220px), center content area (flexible), and review panel placeholder (collapsed)
+**And** the sidebar shows navigation for Dashboard, Knowledge Base, and Settings with active page highlighted
+
+**Given** I am on any page
+**When** I view the interface
+**Then** the design system uses the indigo primary palette, IBM Plex Sans body font, Geist Mono for data, and light/dark theme via data-theme attribute with system preference detection
+
+**Given** I am on a desktop (>=1024px)
+**When** I resize the browser below 1024px
+**Then** the sidebar collapses to 48px icon-only mode
+**And** below 768px the layout switches to single column with bottom tab bar
+
+**Given** data is loading
+**When** any page renders before data arrives
+**Then** skeleton loading states appear matching final component dimensions
+
+### Story 1.3: Trailmix Import & Module Discovery
+
+As a user,
+I want to submit a Trailmix URL and see all discovered modules with their metadata,
+So that I know exactly what content will be processed.
+
+**Acceptance Criteria:**
+
+**Given** I am on the dashboard
+**When** no Trailmix has been imported
+**Then** I see a focused URL input with placeholder "Paste a Trailhead trail or module URL..." and auto-focus
+
+**Given** I paste a valid Trailmix URL and press Enter
+**When** the system processes the URL
+**Then** the input shows a spinner during import
+**And** POST /api/trailmix/import creates a run record and enumerates all modules and units
+**And** each module is stored with: name, type, track, estimated time, unit count, and status "pending"
+
+**Given** I paste an invalid URL
+**When** I submit the form
+**Then** I see an inline validation error: "Enter a valid Trailhead URL" with red border
+**And** the input retains focus for correction
+
+**Given** modules have been imported
+**When** the dashboard renders
+**Then** I see a list of all modules with their names, trail labels, and "queued" status badges
+**And** shared domain types (Module, Unit, Trailmix) are defined in packages/shared with snake_case matching database columns
+
+**Given** the import fails (network error, invalid page)
+**When** the API returns an error
+**Then** a toast notification appears: "Import failed — check URL" (error type, persistent until dismissed)
+
+### Story 1.4: Real-Time Module Status Dashboard
+
+As a user,
+I want module status to update in real-time with hero stats and filter chips,
+So that I can monitor progress at a glance without refreshing.
+
+**Acceptance Criteria:**
+
+**Given** modules exist in the database
+**When** the dashboard loads
+**Then** I see hero stat cards showing: total modules, modules by status, and estimated time
+**And** stat card values use text-3xl monospace font with animated updates on change
+
+**Given** I am viewing the module list
+**When** a module's status changes in the database
+**Then** the module row updates in real-time via Supabase Realtime (Pattern A: router.refresh)
+**And** the status badge color transitions smoothly (150ms ease)
+**And** stat card counts animate to new values
+
+**Given** the pipeline filter chips are displayed
+**When** I click a filter chip (All, Active, Error, Done)
+**Then** the module list filters to show only matching modules
+**And** each chip shows its count in parentheses with real-time updates
+**And** the filter acts as a single-select radiogroup
+
+**Given** I want to query status programmatically
+**When** I call GET /api/modules with optional ?status= filter
+**Then** I receive a paginated response with module data following the ApiResponse envelope
+**And** GET /api/modules/:id returns full module detail with units
+
+**Given** all modules are in "pending" state
+**When** I view the module list
+**Then** modules are sorted: quiz-ready first, then active, then queued, then completed (faded at opacity 0.6)
