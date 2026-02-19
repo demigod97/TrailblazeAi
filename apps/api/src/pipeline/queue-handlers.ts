@@ -7,6 +7,7 @@ import { identifyUnitConcepts } from './stages/identify-concepts.js';
 import { chunkUnitContent } from './stages/chunk-content.js';
 import { generateUnitEmbeddings } from './stages/generate-embeddings.js';
 import { buildUnitRelationships } from './stages/build-relationships.js';
+import { answerModuleQuiz } from '../agents/quiz-agent.js';
 import { PipelineError, SessionExpiredError } from '../lib/errors.js';
 
 const SCRAPE_MODULE_RETRY_LIMIT = 3;
@@ -219,6 +220,17 @@ export async function registerQueueHandlers(boss: PgBoss): Promise<void> {
           .update({ status: 'ready', updated_at: new Date().toISOString() })
           .eq('id', module_id);
       }
+    },
+  );
+
+  // Register answer-quiz worker — answers quiz items for a module using the knowledge base
+  await (boss as unknown as BossWithWork).work(
+    'answer-quiz',
+    { teamSize: 3, teamConcurrency: 3 },
+    async (job: BossJob) => {
+      const { module_id, run_id } = job.data as { module_id: string; run_id: string | null };
+      const supabase = createClient(config.supabaseUrl, config.supabaseServiceKey);
+      await answerModuleQuiz({ module_id, run_id }, supabase);
     },
   );
 

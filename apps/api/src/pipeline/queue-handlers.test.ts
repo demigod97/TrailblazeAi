@@ -53,6 +53,12 @@ const { mockBuildUnitRelationships } = vi.hoisted(() => {
 });
 vi.mock('./stages/build-relationships.js', () => ({ buildUnitRelationships: mockBuildUnitRelationships }));
 
+const { mockAnswerModuleQuiz } = vi.hoisted(() => {
+  const mockAnswerModuleQuiz = vi.fn().mockResolvedValue(undefined);
+  return { mockAnswerModuleQuiz };
+});
+vi.mock('../agents/quiz-agent.js', () => ({ answerModuleQuiz: mockAnswerModuleQuiz }));
+
 import PgBoss from 'pg-boss';
 import { registerQueueHandlers } from './queue-handlers.js';
 import { SessionExpiredError, PipelineError } from '../lib/errors.js';
@@ -968,6 +974,42 @@ describe('Queue Handlers', () => {
         });
         expect(mockModuleUpdate).toHaveBeenCalledWith(
           expect.objectContaining({ status: 'ready' }),
+        );
+      }
+    });
+
+    it('registers answer-quiz queue worker with teamSize: 3 and teamConcurrency: 3', async () => {
+      const mockBoss = {
+        work: vi.fn().mockResolvedValue(undefined),
+        send: vi.fn().mockResolvedValue(undefined),
+      };
+
+      await registerQueueHandlers(mockBoss as any);
+
+      const answerQuizCall = mockBoss.work.mock.calls.find((call: unknown[]) => call[0] === 'answer-quiz');
+      expect(answerQuizCall).toBeDefined();
+      expect(answerQuizCall?.[1]).toEqual({ teamSize: 3, teamConcurrency: 3 });
+    });
+
+    it('answer-quiz handler calls answerModuleQuiz with job data', async () => {
+      const handlers: any[] = [];
+      const mockBoss = {
+        work: vi.fn().mockImplementation(async (queue: string, _options: unknown, handler: any) => {
+          handlers.push({ queue, handler });
+        }),
+        send: vi.fn().mockResolvedValue(undefined),
+      };
+
+      await registerQueueHandlers(mockBoss as any);
+
+      const answerQuizHandler = handlers.find((h) => h.queue === 'answer-quiz')?.handler;
+      expect(answerQuizHandler).toBeDefined();
+
+      if (answerQuizHandler) {
+        await answerQuizHandler({ data: { module_id: 'mod-1', run_id: 'run-1' } });
+        expect(mockAnswerModuleQuiz).toHaveBeenCalledWith(
+          { module_id: 'mod-1', run_id: 'run-1' },
+          expect.anything(),
         );
       }
     });
