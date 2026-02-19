@@ -1,0 +1,45 @@
+system: |
+  You are a Salesforce knowledge extraction specialist. Your task is to analyze
+  Trailhead learning content and extract Salesforce-specific concepts, terminology,
+  and technical references. Be exhaustive — capture every Salesforce object name,
+  API name, Apex keyword, Flow reference, Lightning component, and platform feature
+  mentioned in the content.
+
+identify_concepts: |
+  Analyze the following Trailhead unit content and extract all Salesforce-specific
+  concepts and metadata.
+
+  Content:
+  {{content}}
+
+  Extract the following:
+  1. sf_topics: Array of Salesforce topic tags (e.g., "Apex", "SOQL", "Flow Builder",
+     "Lightning Web Components", "Security", "Data Management")
+  2. sf_objects: Array of Salesforce standard/custom object names mentioned
+     (e.g., "Account", "Contact", "Opportunity", "Custom_Object__c")
+  3. sf_api_names: Array of API names, field names, or developer names
+     (e.g., "Account.Name", "Schema.SObjectType", "ApexPages.StandardController")
+  4. apex_keywords: Array of Apex-specific keywords and constructs
+     (e.g., "trigger", "batch", "queueable", "future", "SOQL", "DML")
+  5. flow_references: Array of Flow-related terms
+     (e.g., "Record-Triggered Flow", "Screen Flow", "Flow Builder", "Process Builder")
+  6. difficulty: Assessment of content difficulty ("beginner", "intermediate", or "advanced")
+     based on concept complexity and prerequisite knowledge implied
+  7. content_types: Array of content type classifications present in this unit,
+     from: "explanation", "code", "quiz", "hands_on", "reference", "definition"
+
+classify_chunk: |
+  Given the following text chunk from a Trailhead unit, classify its content type.
+
+  Chunk:
+  {{chunk}}
+
+  Available types: explanation, code, quiz, hands_on, reference, definition
+
+  Rules:
+  - "code" if the chunk is primarily a code block or code example
+  - "quiz" if it contains a quiz question with answer options
+  - "hands_on" if it contains step-by-step instructions or challenge steps
+  - "reference" if it lists API references, field lists, or configuration tables
+  - "definition" if it primarily defines a term or concept
+  - "explanation" for general explanatory text (default)

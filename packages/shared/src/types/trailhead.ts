@@ -47,6 +47,7 @@ export interface Unit {
   content_markdown: string | null;
   user_id: string | null;
   created_at: string;
+  sf_concepts?: unknown | null;
 }
 
 export interface Run {
@@ -62,7 +63,12 @@ export interface Run {
 export interface SfKnowledgeChunk {
   id: string;
   module_id: string | null;
+  unit_id?: string | null;
   chunk_text: string;
+  content_type?: 'explanation' | 'code' | 'quiz' | 'hands_on' | 'reference' | 'definition' | null;
+  difficulty?: 'beginner' | 'intermediate' | 'advanced' | null;
+  sf_topics?: string[];
+  section_header?: string | null;
   embedding: number[] | null;
   confidence_score: number | null;
   source_url: string | null;

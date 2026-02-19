@@ -3,6 +3,8 @@ import { createClient } from '@trailblaze/db';
 import { config } from '../config.js';
 import { scrapeModule } from './stages/scrape-unit.js';
 import { extractUnitContent } from './stages/extract-content.js';
+import { identifyUnitConcepts } from './stages/identify-concepts.js';
+import { chunkUnitContent } from './stages/chunk-content.js';
 import { PipelineError, SessionExpiredError } from '../lib/errors.js';
 
 const SCRAPE_MODULE_RETRY_LIMIT = 3;
@@ -27,11 +29,16 @@ type BossWithPause = {
   pause(name: string): Promise<void>;
 };
 
+// Structural type for pg-boss send operation
+type BossWithSend = {
+  send(queue: string, data: unknown): Promise<unknown>;
+};
+
 // Structural type for the Supabase client operations used in this handler
 type PipelineClient = {
   from(table: string): {
     select(cols: string): {
-      eq(col: string, val: string): {
+      eq(col: string, val: string): Promise<{ data: Array<unknown> | null; error: { message: string } | null }> & {
         not(col: string, op: string, val: null): Promise<{ data: Array<{ id: string }> | null; error: { message: string } | null }>;
       };
     };
@@ -67,7 +74,7 @@ export async function registerQueueHandlers(boss: PgBoss): Promise<void> {
 
         if (units) {
           for (const unit of units) {
-            await boss.send('extract-content', { unit_id: unit.id, run_id });
+            await boss.send('extract-content', { unit_id: unit.id, module_id, run_id });
           }
         }
       } catch (err) {
@@ -108,14 +115,61 @@ export async function registerQueueHandlers(boss: PgBoss): Promise<void> {
     },
   );
 
-  // Register extract-content worker
+  // Register extract-content worker → chains to identify-concepts
   await (boss as unknown as BossWithWork).work(
     'extract-content',
     { teamSize: 5, teamConcurrency: 5 },
     async (job: BossJob) => {
-      const { unit_id, run_id } = job.data as { unit_id: string; run_id: string | null };
+      const { unit_id, module_id, run_id } = job.data as { unit_id: string; module_id: string; run_id: string | null };
       const supabase = createClient(config.supabaseUrl, config.supabaseServiceKey);
       await extractUnitContent({ unit_id, run_id }, supabase);
+      await (boss as unknown as BossWithSend).send('identify-concepts', { unit_id, module_id, run_id });
+    },
+  );
+
+  // Register identify-concepts worker → chains to chunk-content
+  await (boss as unknown as BossWithWork).work(
+    'identify-concepts',
+    { teamSize: 5, teamConcurrency: 5 },
+    async (job: BossJob) => {
+      const { unit_id, module_id, run_id } = job.data as { unit_id: string; module_id: string; run_id: string | null };
+      const supabase = createClient(config.supabaseUrl, config.supabaseServiceKey);
+      const db = supabase as unknown as PipelineClient;
+
+      // Check if module status is 'scraped' (first unit being processed)
+      const moduleQueryResult = await db
+        .from('modules')
+        .select('status')
+        .eq('id', module_id);
+
+      const modules = moduleQueryResult.data as unknown as Array<{ status?: string }> | null;
+      const moduleError = moduleQueryResult.error;
+
+      if (!moduleError && modules && modules.length > 0) {
+        const moduleStatus = modules[0]?.status;
+        if (moduleStatus === 'scraped') {
+          // Update module status to 'processing'
+          await db
+            .from('modules')
+            .update({ status: 'processing', updated_at: new Date().toISOString() })
+            .eq('id', module_id);
+        }
+      }
+
+      await identifyUnitConcepts({ unit_id, run_id }, supabase);
+      await (boss as unknown as BossWithSend).send('chunk-content', { unit_id, module_id, run_id });
+    },
+  );
+
+  // Register chunk-content worker → chains to generate-embeddings
+  await (boss as unknown as BossWithWork).work(
+    'chunk-content',
+    { teamSize: 5, teamConcurrency: 5 },
+    async (job: BossJob) => {
+      const { unit_id, module_id, run_id } = job.data as { unit_id: string; module_id: string; run_id: string | null };
+      const supabase = createClient(config.supabaseUrl, config.supabaseServiceKey);
+      await chunkUnitContent({ unit_id, module_id, run_id }, supabase);
+      await (boss as unknown as BossWithSend).send('generate-embeddings', { unit_id, module_id, run_id });
     },
   );
 

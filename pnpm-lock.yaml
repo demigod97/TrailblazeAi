@@ -29,6 +29,9 @@ importers:
       '@browserbasehq/stagehand':
         specifier: ^3
         version: 3.0.8(@cfworker/json-schema@4.1.1)(@opentelemetry/api@1.9.0)(deepmerge@4.3.1)(dotenv@16.6.1)(zod@3.25.76)
+      '@chonkiejs/core':
+        specifier: ^0
+        version: 0.0.7
       '@fastify/bearer-auth':
         specifier: ^10
         version: 10.1.2
@@ -438,6 +441,12 @@ packages:
 
   '@cfworker/json-schema@4.1.1':
     resolution: {integrity: sha512-gAmrUZSGtKc3AiBL71iNWxDsyUC5uMaKKGdvzYsBoTW/xi42JQHl7eKV2OYzCUqvc+D2RCcf7EXY2iCyFIk6og==}
+
+  '@chonkiejs/chunk@0.9.3':
+    resolution: {integrity: sha512-uUOeoFGY3s6kzAoKskI50weZN0zvW3oLwUijA1uX7Wxuy9yZStF2IvGuXRigMgP2g/L85lsotYGkjpBMLjQnrg==}
+
+  '@chonkiejs/core@0.0.7':
+    resolution: {integrity: sha512-R17OW9TT1x7B6lDKTCaMd6NluAObleN/cCQtUbMK2UcFOguJtQz/cL0n1t0AzJWBFMVgYP8EcqTFn/fcKhzPiA==}
 
   '@csstools/color-helpers@6.0.1':
     resolution: {integrity: sha512-NmXRccUJMk2AWA5A7e5a//3bCIMyOu2hAtdRYrhPPHjDxINuCwX1w6rnIZ4xjLcp0ayv6h8Pc3X0eJUGiAAXHQ==}
@@ -4800,6 +4809,12 @@ snapshots:
       - utf-8-validate
 
   '@cfworker/json-schema@4.1.1': {}
+
+  '@chonkiejs/chunk@0.9.3': {}
+
+  '@chonkiejs/core@0.0.7':
+    dependencies:
+      '@chonkiejs/chunk': 0.9.3
 
   '@csstools/color-helpers@6.0.1': {}
 

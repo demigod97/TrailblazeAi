@@ -29,6 +29,19 @@ const { mockExtractUnitContent } = vi.hoisted(() => {
 });
 vi.mock('./stages/extract-content.js', () => ({ extractUnitContent: mockExtractUnitContent }));
 
+const { mockIdentifyUnitConcepts } = vi.hoisted(() => {
+  const mockIdentifyUnitConcepts = vi.fn().mockResolvedValue(undefined);
+  return { mockIdentifyUnitConcepts };
+});
+vi.mock('./stages/identify-concepts.js', () => ({ identifyUnitConcepts: mockIdentifyUnitConcepts }));
+
+const { mockChunkUnitContent } = vi.hoisted(() => {
+  const mockChunkUnitContent = vi.fn().mockResolvedValue(undefined);
+  return { mockChunkUnitContent };
+});
+vi.mock('./stages/chunk-content.js', () => ({ chunkUnitContent: mockChunkUnitContent }));
+
+import PgBoss from 'pg-boss';
 import { registerQueueHandlers } from './queue-handlers.js';
 import { SessionExpiredError, PipelineError } from '../lib/errors.js';
 
@@ -207,7 +220,7 @@ describe('Queue Handlers', () => {
       const scrapeHandler = handlers.find((h) => h.queue === 'scrape-module')?.handler;
       if (scrapeHandler) {
         await scrapeHandler({ data: { module_id: 'mod-1', run_id: 'run-1' } });
-        expect(mockBoss.send).toHaveBeenCalledWith('extract-content', { unit_id: 'unit-1', run_id: 'run-1' });
+        expect(mockBoss.send).toHaveBeenCalledWith('extract-content', { unit_id: 'unit-1', module_id: 'mod-1', run_id: 'run-1' });
       }
     });
 
@@ -440,6 +453,253 @@ describe('Queue Handlers', () => {
           }),
         ).rejects.toThrow(PipelineError);
         expect(mockBoss.pause).not.toHaveBeenCalled();
+      }
+    });
+
+    it('registers identify-concepts queue worker', async () => {
+      const mockBoss = {
+        work: vi.fn().mockResolvedValue(undefined),
+        send: vi.fn().mockResolvedValue(undefined),
+      };
+
+      await registerQueueHandlers(mockBoss as any);
+
+      const identifyConceptsCall = mockBoss.work.mock.calls.find((call: unknown[]) => call[0] === 'identify-concepts');
+      expect(identifyConceptsCall).toBeDefined();
+    });
+
+    it('registers identify-concepts with teamSize: 5 and teamConcurrency: 5', async () => {
+      const mockBoss = {
+        work: vi.fn().mockResolvedValue(undefined),
+        send: vi.fn().mockResolvedValue(undefined),
+      };
+
+      await registerQueueHandlers(mockBoss as any);
+
+      const identifyConceptsCall = mockBoss.work.mock.calls.find((call: unknown[]) => call[0] === 'identify-concepts');
+      expect(identifyConceptsCall?.[1]).toEqual({
+        teamSize: 5,
+        teamConcurrency: 5,
+      });
+    });
+
+    it('identify-concepts handler calls identifyUnitConcepts with job data', async () => {
+      const mockBoss = {
+        work: vi.fn().mockImplementation(async (queue: string, _options: unknown, handler: any) => {
+          if (queue === 'identify-concepts') {
+            await handler({
+              data: { unit_id: 'unit-1', module_id: 'module-1', run_id: 'run-1' },
+            });
+          }
+        }),
+        send: vi.fn().mockResolvedValue(undefined),
+      };
+
+      await registerQueueHandlers(mockBoss as any);
+
+      expect(mockIdentifyUnitConcepts).toHaveBeenCalledWith(
+        expect.objectContaining({
+          unit_id: 'unit-1',
+          run_id: 'run-1',
+        }),
+        expect.anything(),
+      );
+    });
+
+    it('identify-concepts handler chains to chunk-content via boss.send', async () => {
+      const handlers: any[] = [];
+      const mockBoss = {
+        work: vi.fn().mockImplementation(async (queue: string, _options: unknown, handler: any) => {
+          handlers.push({ queue, handler });
+        }),
+        send: vi.fn().mockResolvedValue(undefined),
+      };
+
+      await registerQueueHandlers(mockBoss as any);
+
+      const identifyConceptsHandler = handlers.find((h) => h.queue === 'identify-concepts')?.handler;
+      if (identifyConceptsHandler) {
+        await identifyConceptsHandler({
+          data: { unit_id: 'unit-1', module_id: 'module-1', run_id: 'run-1' },
+        });
+        expect(mockBoss.send).toHaveBeenCalledWith('chunk-content', {
+          unit_id: 'unit-1',
+          module_id: 'module-1',
+          run_id: 'run-1',
+        });
+      }
+    });
+
+    it('identify-concepts handler rethrows on error', async () => {
+      const testError = new Error('Identify concepts failed');
+      mockIdentifyUnitConcepts.mockRejectedValueOnce(testError);
+
+      const handlers: any[] = [];
+      const mockBoss = {
+        work: vi.fn().mockImplementation(async (queue: string, _options: unknown, handler: any) => {
+          handlers.push({ queue, handler });
+        }),
+        send: vi.fn().mockResolvedValue(undefined),
+      };
+
+      await registerQueueHandlers(mockBoss as any);
+
+      const identifyConceptsHandler = handlers.find((h) => h.queue === 'identify-concepts')?.handler;
+      expect(identifyConceptsHandler).toBeDefined();
+
+      if (identifyConceptsHandler) {
+        await expect(
+          identifyConceptsHandler({
+            data: { unit_id: 'unit-1', module_id: 'module-1', run_id: 'run-1' },
+          }),
+        ).rejects.toThrow('Identify concepts failed');
+      }
+    });
+
+    it('registers chunk-content queue worker', async () => {
+      const mockBoss = {
+        work: vi.fn().mockResolvedValue(undefined),
+        send: vi.fn().mockResolvedValue(undefined),
+      };
+
+      await registerQueueHandlers(mockBoss as any);
+
+      const chunkContentCall = mockBoss.work.mock.calls.find((call: unknown[]) => call[0] === 'chunk-content');
+      expect(chunkContentCall).toBeDefined();
+    });
+
+    it('registers chunk-content with teamSize: 5 and teamConcurrency: 5', async () => {
+      const mockBoss = {
+        work: vi.fn().mockResolvedValue(undefined),
+        send: vi.fn().mockResolvedValue(undefined),
+      };
+
+      await registerQueueHandlers(mockBoss as any);
+
+      const chunkContentCall = mockBoss.work.mock.calls.find((call: unknown[]) => call[0] === 'chunk-content');
+      expect(chunkContentCall?.[1]).toEqual({
+        teamSize: 5,
+        teamConcurrency: 5,
+      });
+    });
+
+    it('chunk-content handler calls chunkUnitContent with job data', async () => {
+      const mockBoss = {
+        work: vi.fn().mockImplementation(async (queue: string, _options: unknown, handler: any) => {
+          if (queue === 'chunk-content') {
+            await handler({
+              data: { unit_id: 'unit-1', module_id: 'module-1', run_id: 'run-1' },
+            });
+          }
+        }),
+        send: vi.fn().mockResolvedValue(undefined),
+      };
+
+      await registerQueueHandlers(mockBoss as any);
+
+      expect(mockChunkUnitContent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          unit_id: 'unit-1',
+          module_id: 'module-1',
+          run_id: 'run-1',
+        }),
+        expect.anything(),
+      );
+    });
+
+    it('chunk-content handler chains to generate-embeddings via boss.send', async () => {
+      const handlers: any[] = [];
+      const mockBoss = {
+        work: vi.fn().mockImplementation(async (queue: string, _options: unknown, handler: any) => {
+          handlers.push({ queue, handler });
+        }),
+        send: vi.fn().mockResolvedValue(undefined),
+      };
+
+      await registerQueueHandlers(mockBoss as any);
+
+      const chunkContentHandler = handlers.find((h) => h.queue === 'chunk-content')?.handler;
+      if (chunkContentHandler) {
+        await chunkContentHandler({
+          data: { unit_id: 'unit-1', module_id: 'module-1', run_id: 'run-1' },
+        });
+        expect(mockBoss.send).toHaveBeenCalledWith('generate-embeddings', {
+          unit_id: 'unit-1',
+          module_id: 'module-1',
+          run_id: 'run-1',
+        });
+      }
+    });
+
+    it('chunk-content handler rethrows on error', async () => {
+      const testError = new Error('Chunk content failed');
+      mockChunkUnitContent.mockRejectedValueOnce(testError);
+
+      const handlers: any[] = [];
+      const mockBoss = {
+        work: vi.fn().mockImplementation(async (queue: string, _options: unknown, handler: any) => {
+          handlers.push({ queue, handler });
+        }),
+        send: vi.fn().mockResolvedValue(undefined),
+      };
+
+      await registerQueueHandlers(mockBoss as any);
+
+      const chunkContentHandler = handlers.find((h) => h.queue === 'chunk-content')?.handler;
+      expect(chunkContentHandler).toBeDefined();
+
+      if (chunkContentHandler) {
+        await expect(
+          chunkContentHandler({
+            data: { unit_id: 'unit-1', module_id: 'module-1', run_id: 'run-1' },
+          }),
+        ).rejects.toThrow('Chunk content failed');
+      }
+    });
+
+    it('identify-concepts handler updates module status to processing if first unit', async () => {
+      const handlers: unknown[] = [];
+      const mockUpdateFn = vi.fn().mockReturnValue({
+        eq: vi.fn().mockResolvedValue({ error: null }),
+      });
+      const mockSelectEq = vi.fn().mockResolvedValue({
+        data: [{ status: 'scraped' }],
+        error: null,
+      });
+
+      // Override the mockDbFrom to handle both modules and units queries
+      const originalMockDbFrom = mockDbFrom;
+      mockDbFrom.mockImplementation((table: string) => {
+        if (table === 'modules') {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: mockSelectEq,
+            }),
+            update: mockUpdateFn,
+          };
+        }
+        return originalMockDbFrom.call(this, table);
+      });
+
+      const mockBoss = {
+        work: vi.fn().mockImplementation(async (queue: string, _options: unknown, handler: unknown) => {
+          handlers.push({ queue, handler });
+        }),
+        send: vi.fn().mockResolvedValue(undefined),
+      };
+
+      await registerQueueHandlers(mockBoss as unknown as PgBoss);
+
+      const identifyConceptsHandler = (handlers as Array<{ queue: string; handler: (job: unknown) => Promise<void> }>).find((h) => h.queue === 'identify-concepts')?.handler;
+      if (identifyConceptsHandler) {
+        await identifyConceptsHandler({
+          data: { unit_id: 'unit-1', module_id: 'module-1', run_id: 'run-1' },
+        });
+
+        // Assert that update was called with { status: 'processing' } — not just that eq() was called
+        expect(mockUpdateFn).toHaveBeenCalledWith(
+          expect.objectContaining({ status: 'processing' }),
+        );
       }
     });
   });
