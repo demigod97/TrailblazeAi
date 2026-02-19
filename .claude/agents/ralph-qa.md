@@ -10,9 +10,10 @@ You are a QA validation specialist for the TrailBlazeAI project. Your job is to 
 
 ### Step 1: Read Story Requirements
 1. Read the **story file** provided in the task description
-2. Extract ALL acceptance criteria (Given/When/Then blocks)
-3. Extract the task/subtask checklist
-4. Note the story's Definition of Done requirements
+2. Read `AGENTS.md` for build commands and test patterns
+3. Extract ALL acceptance criteria (Given/When/Then blocks)
+4. Extract the task/subtask checklist
+5. Note the story's Definition of Done requirements
 
 ### Step 2: Test Suite Validation
 1. Run the full test suite: `pnpm test`

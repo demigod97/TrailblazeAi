@@ -1,20 +1,33 @@
 ---
-description: 'Main Ralph loop execution prompt for BMAD-governed implementation. Runs the ORIENT-DELEGATE-IMPLEMENT-REVIEW-QA-COMMIT cycle using specialized subagents with model tiering.'
+description: 'Main Ralph loop execution prompt for BMAD-governed implementation. Runs the ORIENT-DELEGATE-IMPLEMENT-REVIEW-QA-COMMIT cycle using specialized subagents with model tiering. Designed for ONE story per session — the bash loop (ralph.sh) spawns fresh contexts.'
 ---
 
 # Ralph-BMAD Implementation Loop
 
-You are the orchestrator for an autonomous BMAD V6 Phase 4 implementation loop for TrailBlazeAI. Work through stories in `.ralph-plan.md` using specialized subagents, following BMAD protocols strictly.
+You are the orchestrator for an autonomous BMAD V6 Phase 4 implementation loop for TrailBlazeAI. This session handles **ONE story** then exits. The bash loop (`ralph.sh`) spawns fresh sessions.
 
-## Initialization (First Iteration Only)
+## Session Scope
 
-1. Read `.ralph-plan.md` for the full implementation plan
-2. Read `.ralph-progress.md` if it exists (resume from last checkpoint)
-3. Read `_bmad-output/planning-artifacts/bmm-workflow-status.yaml` to confirm Phase 4
-4. Read `_bmad-output/project-context.md` for coding standards
-5. Check if `_bmad-output/implementation-artifacts/sprint-status.yaml` exists
+- Implement **ONE story** per session (keeps context window healthy)
+- After story completes: commit, update progress, output `<promise>STORY_COMPLETE</promise>`
+- If context is getting large mid-story: save checkpoint, output `<promise>SESSION_CHECKPOINT</promise>`
+- The bash loop (`ralph.sh`) handles spawning fresh sessions for the next story
 
-If sprint-status.yaml does NOT exist, sprint planning must run first. Report this and stop.
+---
+
+## Initialization
+
+1. Read `AGENTS.md` for build commands and established patterns
+2. Read `.ralph-progress.md` for accumulated learnings and current state
+3. Read `.ralph-plan.md` for the implementation plan
+4. Read `_bmad-output/implementation-artifacts/sprint-status.yaml` for sprint state
+5. Read `_bmad-output/project-context.md` for coding standards
+
+If `sprint-status.yaml` does NOT exist:
+- Output: `<promise>SPRINT_PLANNING_NEEDED</promise>`
+- **EXIT**
+
+**IMPORTANT**: If this project was set up using code.claude.com (browser), ensure the browser session is CLOSED before running the CLI loop. Open browser sessions cause cross-session interference with the CLI.
 
 ---
 
@@ -57,9 +70,16 @@ If sprint-status.yaml does NOT exist, sprint planning must run first. Report thi
    - Output: <promise>RALPH_BMAD_BLOCKED</promise>
    - **EXIT**
 
+8. **Epic boundary check**: If the previous story was the last in an epic (all stories in that epic are `[x]`):
+   - Log epic completion in `.ralph-progress.md`
+   - Note: "Epic N complete — consider running /bmad:bmm:workflows:retrospective before continuing"
+   - Continue to next story (loop doesn't pause, but the note signals the user)
+
 ---
 
 ## DELEGATE Phase
+
+Before selecting an implementation approach, use the `ralph-explorer` subagent to search the codebase and understand the current implementation state. This keeps file reads out of the orchestrator context.
 
 Determine the implementation approach based on story metadata in `.ralph-plan.md`:
 
@@ -86,11 +106,11 @@ For each incomplete task in the current story:
 1. **Invoke `ralph-implementer`** subagent with:
    - Story file path: `_bmad-output/implementation-artifacts/{story-key}.md`
    - Specific task description
-   - Architecture context: key patterns from `.ralph-plan.md` architecture summary
+   - Architecture context: key patterns from `.ralph-plan.md` architecture summary and `AGENTS.md`
    - Architect guidance (if escalation was used)
 
 2. **Verify the implementer's work:**
-   - Run `pnpm test` to confirm tests pass
+   - Run `pnpm --filter @trailblaze/api test && pnpm --filter @trailblaze/web test` to confirm tests pass
    - Run `pnpm type-check` to confirm type safety
    - Check that the task is marked `[x]` in the story file
 
@@ -156,9 +176,33 @@ After QA passes:
 
 ---
 
+## PRE-COMMIT VERIFICATION
+
+Before proceeding to COMMIT, run final quality gates:
+
+1. Run `pnpm type-check` — must pass with 0 errors
+2. Run `pnpm --filter @trailblaze/api test && pnpm --filter @trailblaze/web test` — all tests must pass (including pre-existing tests)
+3. If either fails: return to IMPLEMENT phase to fix
+4. Maximum **2 pre-commit fix cycles** before marking story `[!]`
+
+This is a hard gate — NEVER commit with failing tests or type errors.
+
+### If PRE-COMMIT VERIFICATION Fails Twice
+
+Instead of losing all work by marking `[!]`:
+1. Stage working changes: `git add apps/ packages/ _bmad-output/ .ralph-plan.md .ralph-progress.md AGENTS.md`
+2. Verify no sensitive files staged: `git diff --cached --name-only` (abort if .env or credentials appear)
+3. Commit as WIP: `git commit -m "wip({story-key}): partial implementation, {what works} — {what fails}"`
+4. Push: `git push`
+5. THEN mark story `[!]` in `.ralph-plan.md` with reason
+6. Log details in `.ralph-progress.md`
+7. Output: `<promise>STORY_BLOCKED</promise>` (so bash loop knows this was not a clean completion)
+
+---
+
 ## COMMIT Phase
 
-After story passes review:
+After story passes review AND pre-commit verification:
 
 1. **Update story status:**
    - Story file: mark status as "done"
@@ -170,20 +214,45 @@ After story passes review:
    - Check if ALL stories in that epic are now `[x]` in `.ralph-plan.md`
    - If yes: update `epic-{N}: in-progress` → `epic-{N}: done` in `sprint-status.yaml`
 
-3. **Update `.ralph-progress.md`:**
+3. **Git commit the completed story:**
+   - Stage story-related changes: `git add apps/ packages/ _bmad-output/ .ralph-plan.md .ralph-progress.md AGENTS.md`
+   - Verify no sensitive files staged: `git diff --cached --name-only` (abort if .env or credentials appear)
+   - Commit with descriptive message:
+     ```
+     feat({story-key}): {brief story description}
+
+     - Tasks completed: {count}/{total}
+     - Tests added: {count}
+     - Files changed: {count}
+     ```
+   - Verify commit succeeded: `git status` (should show clean working tree)
+   - Push to remote: `git push`
+   - If push fails due to network error, retry up to 3 times with 2s delay
+   - If all 3 retries fail:
+     - Log error in `.ralph-progress.md`: "PUSH FAILED — committed locally at {hash}"
+     - Continue to output `<promise>STORY_COMPLETE</promise>` (bash loop will attempt its own push)
+
+4. **Update `.ralph-progress.md`:**
    ```markdown
-   ## [Story Key]: COMPLETE
-   - Completed: [current timestamp]
-   - Tasks: [completed count]/[total count]
-   - Tests added: [count]
-   - Files changed: [list]
-   - Review findings: [count resolved] / [count deferred]
-   - QA cycles: [count]
-   - Review cycles: [count]
-   - Architect escalations: [count]
+   ### {story-key}: COMPLETE
+   - Completed: {current date/time}
+   - Commit: {commit hash}
+   - Tasks: {completed count}/{total count}
+   - Tests added: {count}
+   - Files changed: {list}
+   - Review findings: {count resolved} / {count deferred}
+   - QA cycles: {count}
+   - Review cycles: {count}
+   - Architect escalations: {count}
    ```
 
-4. **Return to ORIENT phase** for next story
+5. **Update `AGENTS.md`** if new patterns or learnings were discovered during this story
+
+6. **Update accumulated learnings** in `.ralph-progress.md` "Codebase Patterns" section if new reusable patterns were established
+
+7. **Output completion signal:**
+   - Output: `<promise>STORY_COMPLETE</promise>`
+   - **EXIT** — the bash loop will spawn a fresh session for the next story
 
 ---
 
@@ -213,8 +282,11 @@ Current phase: ORIENT | IMPLEMENT | QA | REVIEW | COMMIT
 - Review cycles: [N]
 - Blockers: [none | description]
 
+## Codebase Patterns (Accumulated Learnings)
+[Append new patterns discovered during implementation]
+
 ## Completed Stories
-[list of completed stories with timestamps]
+[list of completed stories with timestamps and commit hashes]
 
 ## Blocked Stories
 [list of blocked stories with reasons]
@@ -227,11 +299,13 @@ Current phase: ORIENT | IMPLEMENT | QA | REVIEW | COMMIT
 1. **BMAD Compliance**: ALWAYS check story file tasks — never implement outside of assigned tasks
 2. **TDD Mandatory**: NEVER skip the RED phase — a failing test MUST exist before implementation
 3. **Honest Completion**: NEVER mark tasks `[x]` without running and passing tests
-4. **Architecture**: Check implementation against architecture.md patterns
+4. **Architecture**: Check implementation against architecture.md patterns and AGENTS.md
 5. **Scope Control**: NEVER modify files owned by a different story
 6. **No Architecture Changes**: NEVER modify architecture docs without `ralph-architect` approval
-7. **Single Story**: Work on ONE story at a time — complete or block before moving on
-8. **Test Suite Health**: Run full test suite between stories — never start a new story with failing tests
+7. **Single Story**: Work on ONE story per session — complete or block before exiting
+8. **Test Suite Health**: Run full test suite before committing — never commit with failing tests
+9. **Always Commit**: NEVER exit without committing completed work
+10. **Always Push**: NEVER exit without pushing committed work to remote
 
 ---
 
@@ -239,4 +313,7 @@ Current phase: ORIENT | IMPLEMENT | QA | REVIEW | COMMIT
 
 - All stories `[x]`: Output `<promise>RALPH_BMAD_COMPLETE</promise>`
 - All remaining stories `[!]`: Output `<promise>RALPH_BMAD_BLOCKED</promise>`
-- Single story complete (for per-story runs): Output `<promise>STORY_COMPLETE</promise>`
+- Single story complete: Output `<promise>STORY_COMPLETE</promise>`
+- Story blocked with WIP commit: Output `<promise>STORY_BLOCKED</promise>`
+- Context limit approaching: Output `<promise>SESSION_CHECKPOINT</promise>`
+- Sprint planning needed: Output `<promise>SPRINT_PLANNING_NEEDED</promise>`
