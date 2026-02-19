@@ -1,5 +1,6 @@
 import { ThreeColumnShell } from '@/components/layout';
 import { Sidebar } from '@/components/layout';
+import { CommandMenu } from '@/components/layout/command-menu';
 
 export default function DashboardLayout({
   children,
@@ -7,8 +8,9 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <ThreeColumnShell sidebar={<Sidebar />}>
-      {children}
-    </ThreeColumnShell>
+    <>
+      <CommandMenu />
+      <ThreeColumnShell sidebar={<Sidebar />}>{children}</ThreeColumnShell>
+    </>
   );
 }

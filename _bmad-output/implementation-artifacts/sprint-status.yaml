@@ -53,12 +53,12 @@ development_status:
   epic-2-retrospective: optional
 
   # Epic 3: Knowledge Processing & Search
-  epic-3: in-progress
+  epic-3: done
   3-1-content-chunking-with-salesforce-specific-rules: done
   3-2-embedding-generation-and-vector-storage: done
   3-3-concept-relationship-mapping: done
   3-4-hybrid-search-and-knowledge-api: done
-  3-5-knowledge-base-ui-with-global-search: backlog
+  3-5-knowledge-base-ui-with-global-search: done
   epic-3-retrospective: optional
 
   # Epic 4: Quiz Automation & Review
