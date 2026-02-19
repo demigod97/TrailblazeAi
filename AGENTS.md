@@ -29,3 +29,11 @@ pnpm --filter @trailblaze/api dev      # Fastify dev server only (tsx watch)
 ## Code Patterns
 
 For detailed TypeScript patterns (pipeline stages, Supabase types, queue handlers, AI SDK, error handling, ESM imports, testing strategy), see `.claude/rules/code-patterns.md`.
+
+## AI SDK Version Alignment (Story 3-2)
+
+`ai@6` uses V3 provider protocol. Matching provider packages:
+- `@ai-sdk/anthropic@^3` — used for `generateObject()` / `generateText()`
+- `@ai-sdk/openai@^2` — use for `embedMany()` with `openai.embedding()` (NOT `^1` which is V1/incompatible)
+
+With `@ai-sdk/openai@^2`, `openai.embedding()` returns `EmbeddingModelV2<string>` which is in `ai@6`'s `EmbeddingModel` union — **no cast required**. Using `^1` causes a V1/V2 mismatch silenced only by `as unknown as any`.

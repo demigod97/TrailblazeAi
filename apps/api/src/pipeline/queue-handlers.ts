@@ -5,6 +5,7 @@ import { scrapeModule } from './stages/scrape-unit.js';
 import { extractUnitContent } from './stages/extract-content.js';
 import { identifyUnitConcepts } from './stages/identify-concepts.js';
 import { chunkUnitContent } from './stages/chunk-content.js';
+import { generateUnitEmbeddings } from './stages/generate-embeddings.js';
 import { PipelineError, SessionExpiredError } from '../lib/errors.js';
 
 const SCRAPE_MODULE_RETRY_LIMIT = 3;
@@ -170,6 +171,18 @@ export async function registerQueueHandlers(boss: PgBoss): Promise<void> {
       const supabase = createClient(config.supabaseUrl, config.supabaseServiceKey);
       await chunkUnitContent({ unit_id, module_id, run_id }, supabase);
       await (boss as unknown as BossWithSend).send('generate-embeddings', { unit_id, module_id, run_id });
+    },
+  );
+
+  // Register generate-embeddings worker → chains to build-relationships
+  await (boss as unknown as BossWithWork).work(
+    'generate-embeddings',
+    { teamSize: 5, teamConcurrency: 5 },
+    async (job: BossJob) => {
+      const { unit_id, module_id, run_id } = job.data as { unit_id: string; module_id: string; run_id: string | null };
+      const supabase = createClient(config.supabaseUrl, config.supabaseServiceKey);
+      await generateUnitEmbeddings({ unit_id, module_id, run_id }, supabase);
+      await (boss as unknown as BossWithSend).send('build-relationships', { unit_id, module_id, run_id });
     },
   );
 

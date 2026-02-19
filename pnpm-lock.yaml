@@ -26,6 +26,9 @@ importers:
       '@ai-sdk/mcp':
         specifier: ^0
         version: 0.0.14(zod@3.25.76)
+      '@ai-sdk/openai':
+        specifier: ^2
+        version: 2.0.91(zod@3.25.76)
       '@browserbasehq/stagehand':
         specifier: ^3
         version: 3.0.8(@cfworker/json-schema@4.1.1)(@opentelemetry/api@1.9.0)(deepmerge@4.3.1)(dotenv@16.6.1)(zod@3.25.76)
@@ -4546,7 +4549,6 @@ snapshots:
       '@ai-sdk/provider': 2.0.1
       '@ai-sdk/provider-utils': 3.0.21(zod@3.25.76)
       zod: 3.25.76
-    optional: true
 
   '@ai-sdk/perplexity@2.0.24(zod@3.25.76)':
     dependencies:

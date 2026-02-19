@@ -41,6 +41,12 @@ const { mockChunkUnitContent } = vi.hoisted(() => {
 });
 vi.mock('./stages/chunk-content.js', () => ({ chunkUnitContent: mockChunkUnitContent }));
 
+const { mockGenerateUnitEmbeddings } = vi.hoisted(() => {
+  const mockGenerateUnitEmbeddings = vi.fn().mockResolvedValue(undefined);
+  return { mockGenerateUnitEmbeddings };
+});
+vi.mock('./stages/generate-embeddings.js', () => ({ generateUnitEmbeddings: mockGenerateUnitEmbeddings }));
+
 import PgBoss from 'pg-boss';
 import { registerQueueHandlers } from './queue-handlers.js';
 import { SessionExpiredError, PipelineError } from '../lib/errors.js';
@@ -700,6 +706,107 @@ describe('Queue Handlers', () => {
         expect(mockUpdateFn).toHaveBeenCalledWith(
           expect.objectContaining({ status: 'processing' }),
         );
+      }
+    });
+
+    it('registers generate-embeddings queue worker', async () => {
+      const mockBoss = {
+        work: vi.fn().mockResolvedValue(undefined),
+        send: vi.fn().mockResolvedValue(undefined),
+      };
+
+      await registerQueueHandlers(mockBoss as any);
+
+      const generateEmbeddingsCall = mockBoss.work.mock.calls.find((call: unknown[]) => call[0] === 'generate-embeddings');
+      expect(generateEmbeddingsCall).toBeDefined();
+    });
+
+    it('registers generate-embeddings with teamSize: 5 and teamConcurrency: 5', async () => {
+      const mockBoss = {
+        work: vi.fn().mockResolvedValue(undefined),
+        send: vi.fn().mockResolvedValue(undefined),
+      };
+
+      await registerQueueHandlers(mockBoss as any);
+
+      const generateEmbeddingsCall = mockBoss.work.mock.calls.find((call: unknown[]) => call[0] === 'generate-embeddings');
+      expect(generateEmbeddingsCall?.[1]).toEqual({
+        teamSize: 5,
+        teamConcurrency: 5,
+      });
+    });
+
+    it('generate-embeddings handler calls generateUnitEmbeddings with job data', async () => {
+      const mockBoss = {
+        work: vi.fn().mockImplementation(async (queue: string, _options: unknown, handler: any) => {
+          if (queue === 'generate-embeddings') {
+            await handler({
+              data: { unit_id: 'unit-1', module_id: 'module-1', run_id: 'run-1' },
+            });
+          }
+        }),
+        send: vi.fn().mockResolvedValue(undefined),
+      };
+
+      await registerQueueHandlers(mockBoss as any);
+
+      expect(mockGenerateUnitEmbeddings).toHaveBeenCalledWith(
+        expect.objectContaining({
+          unit_id: 'unit-1',
+          module_id: 'module-1',
+          run_id: 'run-1',
+        }),
+        expect.anything(),
+      );
+    });
+
+    it('generate-embeddings handler chains to build-relationships via boss.send', async () => {
+      const handlers: any[] = [];
+      const mockBoss = {
+        work: vi.fn().mockImplementation(async (queue: string, _options: unknown, handler: any) => {
+          handlers.push({ queue, handler });
+        }),
+        send: vi.fn().mockResolvedValue(undefined),
+      };
+
+      await registerQueueHandlers(mockBoss as any);
+
+      const generateEmbeddingsHandler = handlers.find((h) => h.queue === 'generate-embeddings')?.handler;
+      if (generateEmbeddingsHandler) {
+        await generateEmbeddingsHandler({
+          data: { unit_id: 'unit-1', module_id: 'module-1', run_id: 'run-1' },
+        });
+        expect(mockBoss.send).toHaveBeenCalledWith('build-relationships', {
+          unit_id: 'unit-1',
+          module_id: 'module-1',
+          run_id: 'run-1',
+        });
+      }
+    });
+
+    it('generate-embeddings handler rethrows on error', async () => {
+      const testError = new Error('Embeddings generation failed');
+      mockGenerateUnitEmbeddings.mockRejectedValueOnce(testError);
+
+      const handlers: any[] = [];
+      const mockBoss = {
+        work: vi.fn().mockImplementation(async (queue: string, _options: unknown, handler: any) => {
+          handlers.push({ queue, handler });
+        }),
+        send: vi.fn().mockResolvedValue(undefined),
+      };
+
+      await registerQueueHandlers(mockBoss as any);
+
+      const generateEmbeddingsHandler = handlers.find((h) => h.queue === 'generate-embeddings')?.handler;
+      expect(generateEmbeddingsHandler).toBeDefined();
+
+      if (generateEmbeddingsHandler) {
+        await expect(
+          generateEmbeddingsHandler({
+            data: { unit_id: 'unit-1', module_id: 'module-1', run_id: 'run-1' },
+          }),
+        ).rejects.toThrow('Embeddings generation failed');
       }
     });
   });
