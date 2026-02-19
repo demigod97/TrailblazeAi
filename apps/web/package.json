@@ -20,7 +20,7 @@
     "ai": "^6",
     "class-variance-authority": "^0.7",
     "clsx": "^2.1",
-    "lucide-react": "^0.474",
+    "lucide-react": "^0.574",
     "next": "^16.1",
     "radix-ui": "^1.4.3",
     "react": "^19",
