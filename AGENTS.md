@@ -3,11 +3,10 @@
 ## Build & Test Commands
 
 ```bash
-pnpm test                              # Run all tests (Vitest)
+pnpm --filter @trailblaze/api test     # Run API tests (Vitest)
+pnpm --filter @trailblaze/web test     # Run web tests (Vitest)
 pnpm type-check                        # TypeScript strict check all packages
 pnpm build                             # Build all packages
-pnpm --filter @trailblaze/api test     # API tests only
-pnpm --filter @trailblaze/web test     # Web tests only
 pnpm dev                               # Start all dev servers (turbo)
 pnpm --filter @trailblaze/web dev      # Next.js dev server only
 pnpm --filter @trailblaze/api dev      # Fastify dev server only (tsx watch)

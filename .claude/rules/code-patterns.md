@@ -59,11 +59,13 @@ const { object } = await generateObject({
 ## YAML Prompt Loading
 
 ```typescript
-import { readFileSync } from 'fs';
+import { readFile } from 'fs/promises';
 import { parse as parseYaml } from 'yaml';
-const prompts = parseYaml(readFileSync(promptsPath, 'utf-8'));
+const content = await readFile(promptsPath, 'utf-8');
+const prompts = parseYaml(content);
 ```
-Load at module level (not per-call) for performance.
+Reference: `apps/api/src/agents/scraper-agent.ts`
+Load at startup or cache the result (not per-call) for performance.
 
 ## ESM Imports
 

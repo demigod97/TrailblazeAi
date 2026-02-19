@@ -17,10 +17,22 @@ set -euo pipefail
 
 MAX_ITERATIONS=${1:-20}
 VERBOSE=${2:-""}
+
+if ! [[ "$MAX_ITERATIONS" =~ ^[0-9]+$ ]]; then
+    echo "Usage: ./ralph.sh [max_iterations] [--verbose]"
+    exit 1
+fi
 ITERATION=0
 PLAN_FILE=".ralph-plan.md"
 PROGRESS_FILE=".ralph-progress.md"
 LOG_FILE=".ralph-loop.log"
+OUTPUT_FILE=""
+RATE_LIMIT_COUNT=0
+
+cleanup() {
+    [ -n "$OUTPUT_FILE" ] && [ -f "$OUTPUT_FILE" ] && rm -f "$OUTPUT_FILE"
+}
+trap cleanup EXIT INT TERM
 
 # Colors for terminal output
 RED='\033[0;31m'
@@ -69,13 +81,8 @@ if [ ! -f "$PROGRESS_FILE" ]; then
 fi
 
 if [ ! -f "AGENTS.md" ]; then
-    warn "Missing AGENTS.md — creating minimal version"
-    echo "# AGENTS.md — Operational Knowledge" > AGENTS.md
-    echo "" >> AGENTS.md
-    echo "## Build Commands" >> AGENTS.md
-    echo "- pnpm test" >> AGENTS.md
-    echo "- pnpm type-check" >> AGENTS.md
-    echo "- pnpm build" >> AGENTS.md
+    error "Missing AGENTS.md — required for Claude Code sessions"
+    exit 1
 fi
 
 # Git state pre-checks
@@ -97,6 +104,11 @@ fi
 
 if ! git config user.name > /dev/null 2>&1 || ! git config user.email > /dev/null 2>&1; then
     error "Git identity not set. Run: git config user.name 'Name' && git config user.email 'email@example.com'"
+    exit 1
+fi
+
+if ! command -v claude &>/dev/null; then
+    error "Claude Code CLI not found. Install: https://docs.anthropic.com/claude-code"
     exit 1
 fi
 
@@ -136,18 +148,22 @@ while [ "$ITERATION" -lt "$MAX_ITERATIONS" ]; do
     DONE=$(count_done)
     BLOCKED=$(count_blocked)
 
+    if [ ! -r "$PLAN_FILE" ]; then
+        error "Plan file $PLAN_FILE is not readable. Aborting."
+        exit 1
+    fi
+
     log "--- Iteration $ITERATION / $MAX_ITERATIONS ---"
     log "Status: Pending=$PENDING In-Progress=$IN_PROGRESS Done=$DONE Blocked=$BLOCKED"
 
     # Check completion conditions
     if [ "$PENDING" -eq 0 ] && [ "$IN_PROGRESS" -eq 0 ]; then
-        success "All stories complete! ($DONE done, $BLOCKED blocked)"
+        if [ "$BLOCKED" -gt 0 ]; then
+            warn "All remaining stories are blocked ($BLOCKED). Check $PROGRESS_FILE"
+            exit 1
+        fi
+        success "All stories complete! ($DONE done)"
         exit 0
-    fi
-
-    if [ "$PENDING" -eq 0 ] && [ "$IN_PROGRESS" -eq 0 ] && [ "$BLOCKED" -gt 0 ]; then
-        warn "All remaining stories are blocked ($BLOCKED). Check $PROGRESS_FILE"
-        exit 1
     fi
 
     # Run Claude Code with fresh context
@@ -167,47 +183,53 @@ while [ "$ITERATION" -lt "$MAX_ITERATIONS" ]; do
 
     # Read the output
     OUTPUT=$(cat "$OUTPUT_FILE")
-    rm -f "$OUTPUT_FILE"
 
     # Log output if verbose
     if [ "$VERBOSE" = "--verbose" ]; then
         echo "$OUTPUT" >> "$LOG_FILE"
     fi
 
-    # Check for completion signals in output
+    # Check for completion signals in output (elif chain — only first match matters)
     if echo "$OUTPUT" | grep -q "RALPH_BMAD_COMPLETE"; then
         success "RALPH_BMAD_COMPLETE — All stories implemented!"
         exit 0
-    fi
-
-    if echo "$OUTPUT" | grep -q "RALPH_BMAD_BLOCKED"; then
+    elif echo "$OUTPUT" | grep -q "RALPH_BMAD_BLOCKED"; then
         warn "RALPH_BMAD_BLOCKED — All remaining stories blocked"
         exit 1
-    fi
-
-    if echo "$OUTPUT" | grep -q "STORY_COMPLETE"; then
-        success "Story completed. Fresh context for next story..."
-    fi
-
-    if echo "$OUTPUT" | grep -q "SESSION_CHECKPOINT"; then
-        warn "Session checkpoint — context limit approaching. Fresh context..."
-    fi
-
-    if echo "$OUTPUT" | grep -q "SPRINT_PLANNING_NEEDED"; then
+    elif echo "$OUTPUT" | grep -q "SPRINT_PLANNING_NEEDED"; then
         error "Sprint planning must run first. Run /bmad:bmm:workflows:sprint-planning"
         exit 1
+    elif echo "$OUTPUT" | grep -q "STORY_COMPLETE"; then
+        success "Story completed. Fresh context for next story..."
+        RATE_LIMIT_COUNT=0
+    elif echo "$OUTPUT" | grep -q "STORY_BLOCKED"; then
+        warn "Story blocked with WIP commit. Check .ralph-progress.md for details."
+        RATE_LIMIT_COUNT=0
+    elif echo "$OUTPUT" | grep -q "SESSION_CHECKPOINT"; then
+        warn "Session checkpoint — context limit approaching. Fresh context..."
+        NO_PROGRESS_COUNT=0  # Checkpoints are intentional, not stalls
+        RATE_LIMIT_COUNT=0
     fi
 
-    # Rate limit detection
-    if echo "$OUTPUT" | grep -qi "rate.limit\|429\|usage limit\|too many requests\|overloaded"; then
-        warn "Rate limit detected at iteration $ITERATION. Waiting 5 minutes..."
+    # Rate limit detection (check last 50 lines, use specific patterns, cap retries)
+    TAIL_OUTPUT=$(echo "$OUTPUT" | tail -50)
+    if echo "$TAIL_OUTPUT" | grep -qi "rate limit exceeded\|HTTP 429\|usage limit reached\|too many requests"; then
+        RATE_LIMIT_COUNT=$((RATE_LIMIT_COUNT + 1))
+        if [ "$RATE_LIMIT_COUNT" -ge 5 ]; then
+            error "Rate limited 5 times consecutively. Aborting."
+            exit 1
+        fi
+        warn "Rate limit detected ($RATE_LIMIT_COUNT/5) at iteration $ITERATION. Waiting 5 minutes..."
         sleep 300
         ITERATION=$((ITERATION - 1))  # Don't count this iteration
         continue
     fi
 
     # Circuit breaker: detect no-commit stalls
-    CURRENT_COMMIT=$(git rev-parse HEAD)
+    CURRENT_COMMIT=$(git rev-parse HEAD 2>/dev/null) || {
+        error "Failed to read git commit. Repository may be corrupted."
+        break
+    }
     if [ "$CURRENT_COMMIT" = "$LAST_COMMIT" ]; then
         NO_PROGRESS_COUNT=$((NO_PROGRESS_COUNT + 1))
         warn "No new commit. Stall count: $NO_PROGRESS_COUNT/$NO_PROGRESS_THRESHOLD"
@@ -217,11 +239,14 @@ while [ "$ITERATION" -lt "$MAX_ITERATIONS" ]; do
         fi
     else
         NO_PROGRESS_COUNT=0
+        RATE_LIMIT_COUNT=0
         LAST_COMMIT="$CURRENT_COMMIT"
     fi
 
     # Fallback push after each iteration (best-effort)
-    git push origin "$CURRENT_BRANCH" 2>/dev/null || true
+    PUSH_OUTPUT=$(git push origin "$CURRENT_BRANCH" 2>&1) || {
+        warn "Git push failed (non-fatal): $PUSH_OUTPUT"
+    }
 
     # Adaptive pause (3s normal, 10s if stalling)
     if [ "$NO_PROGRESS_COUNT" -gt 0 ]; then

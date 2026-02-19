@@ -110,7 +110,7 @@ For each incomplete task in the current story:
    - Architect guidance (if escalation was used)
 
 2. **Verify the implementer's work:**
-   - Run `pnpm test` to confirm tests pass
+   - Run `pnpm --filter @trailblaze/api test && pnpm --filter @trailblaze/web test` to confirm tests pass
    - Run `pnpm type-check` to confirm type safety
    - Check that the task is marked `[x]` in the story file
 
@@ -181,7 +181,7 @@ After QA passes:
 Before proceeding to COMMIT, run final quality gates:
 
 1. Run `pnpm type-check` — must pass with 0 errors
-2. Run `pnpm test` — all tests must pass (including pre-existing tests)
+2. Run `pnpm --filter @trailblaze/api test && pnpm --filter @trailblaze/web test` — all tests must pass (including pre-existing tests)
 3. If either fails: return to IMPLEMENT phase to fix
 4. Maximum **2 pre-commit fix cycles** before marking story `[!]`
 
@@ -190,12 +190,13 @@ This is a hard gate — NEVER commit with failing tests or type errors.
 ### If PRE-COMMIT VERIFICATION Fails Twice
 
 Instead of losing all work by marking `[!]`:
-1. Stage working changes: `git add -A`
-2. Commit as WIP: `git commit -m "wip({story-key}): partial implementation, {what works} — {what fails}"`
-3. Push: `git push`
-4. THEN mark story `[!]` in `.ralph-plan.md` with reason
-5. Log details in `.ralph-progress.md`
-6. Output: `<promise>STORY_COMPLETE</promise>` (so bash loop moves to next story)
+1. Stage working changes: `git add apps/ packages/ _bmad-output/ .ralph-plan.md .ralph-progress.md AGENTS.md`
+2. Verify no sensitive files staged: `git diff --cached --name-only` (abort if .env or credentials appear)
+3. Commit as WIP: `git commit -m "wip({story-key}): partial implementation, {what works} — {what fails}"`
+4. Push: `git push`
+5. THEN mark story `[!]` in `.ralph-plan.md` with reason
+6. Log details in `.ralph-progress.md`
+7. Output: `<promise>STORY_BLOCKED</promise>` (so bash loop knows this was not a clean completion)
 
 ---
 
@@ -214,7 +215,8 @@ After story passes review AND pre-commit verification:
    - If yes: update `epic-{N}: in-progress` → `epic-{N}: done` in `sprint-status.yaml`
 
 3. **Git commit the completed story:**
-   - Stage all changes: `git add -A`
+   - Stage story-related changes: `git add apps/ packages/ _bmad-output/ .ralph-plan.md .ralph-progress.md AGENTS.md`
+   - Verify no sensitive files staged: `git diff --cached --name-only` (abort if .env or credentials appear)
    - Commit with descriptive message:
      ```
      feat({story-key}): {brief story description}
@@ -226,6 +228,9 @@ After story passes review AND pre-commit verification:
    - Verify commit succeeded: `git status` (should show clean working tree)
    - Push to remote: `git push`
    - If push fails due to network error, retry up to 3 times with 2s delay
+   - If all 3 retries fail:
+     - Log error in `.ralph-progress.md`: "PUSH FAILED — committed locally at {hash}"
+     - Continue to output `<promise>STORY_COMPLETE</promise>` (bash loop will attempt its own push)
 
 4. **Update `.ralph-progress.md`:**
    ```markdown
@@ -309,5 +314,6 @@ Current phase: ORIENT | IMPLEMENT | QA | REVIEW | COMMIT
 - All stories `[x]`: Output `<promise>RALPH_BMAD_COMPLETE</promise>`
 - All remaining stories `[!]`: Output `<promise>RALPH_BMAD_BLOCKED</promise>`
 - Single story complete: Output `<promise>STORY_COMPLETE</promise>`
+- Story blocked with WIP commit: Output `<promise>STORY_BLOCKED</promise>`
 - Context limit approaching: Output `<promise>SESSION_CHECKPOINT</promise>`
 - Sprint planning needed: Output `<promise>SPRINT_PLANNING_NEEDED</promise>`
