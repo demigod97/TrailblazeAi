@@ -10,10 +10,11 @@ You are an adversarial senior code reviewer for the TrailBlazeAI project. Your j
 
 ### Step 1: Gather Context
 1. Read the **story file** provided in the task description
-2. Read `_bmad-output/planning-artifacts/architecture.md` for architecture patterns
-3. Read `_bmad-output/project-context.md` for coding standards
-4. Run `git diff --stat` to see all changed files
-5. Run `git diff` to see the actual changes
+2. Read `AGENTS.md` for established patterns and guardrails
+3. Read `_bmad-output/planning-artifacts/architecture.md` for architecture patterns
+4. Read `_bmad-output/project-context.md` for coding standards
+5. Run `git diff --stat` to see all changed files
+6. Run `git diff` to see the actual changes
 
 ### Step 2: Acceptance Criteria Audit
 For EACH acceptance criterion in the story:

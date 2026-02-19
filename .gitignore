@@ -55,5 +55,5 @@ task_plan.md
 findings.md
 progress.md
 
-# Ralph loop (ephemeral runtime state)
-.ralph-progress.md
+# Ralph loop (ephemeral runtime logs — NOT .ralph-progress.md which is tracked)
+.ralph-loop.log
