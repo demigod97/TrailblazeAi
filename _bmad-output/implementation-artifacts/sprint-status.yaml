@@ -57,7 +57,7 @@ development_status:
   3-1-content-chunking-with-salesforce-specific-rules: done
   3-2-embedding-generation-and-vector-storage: done
   3-3-concept-relationship-mapping: done
-  3-4-hybrid-search-and-knowledge-api: backlog
+  3-4-hybrid-search-and-knowledge-api: done
   3-5-knowledge-base-ui-with-global-search: backlog
   epic-3-retrospective: optional
 
