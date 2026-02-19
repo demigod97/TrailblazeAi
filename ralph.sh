@@ -78,6 +78,33 @@ if [ ! -f "AGENTS.md" ]; then
     echo "- pnpm build" >> AGENTS.md
 fi
 
+# Git state pre-checks
+CURRENT_BRANCH=$(git branch --show-current)
+if [ -z "$CURRENT_BRANCH" ]; then
+    error "Not on any branch (detached HEAD). Fix before running."
+    exit 1
+fi
+
+if git status --porcelain | grep -q "^UU\|^AA\|^DD"; then
+    error "Unresolved merge conflicts. Run 'git merge --continue' or 'git merge --abort' first."
+    exit 1
+fi
+
+if [ -f ".git/MERGE_HEAD" ]; then
+    error "Git is in MERGING state. Finalize merge before running Ralph loop."
+    exit 1
+fi
+
+if ! git config user.name > /dev/null 2>&1 || ! git config user.email > /dev/null 2>&1; then
+    error "Git identity not set. Run: git config user.name 'Name' && git config user.email 'email@example.com'"
+    exit 1
+fi
+
+# Circuit breaker state
+LAST_COMMIT=$(git rev-parse HEAD)
+NO_PROGRESS_COUNT=0
+NO_PROGRESS_THRESHOLD=3
+
 # Check for pending stories
 count_pending() {
     grep -c '^\- \[ \]' "$PLAN_FILE" 2>/dev/null || echo "0"
@@ -97,6 +124,7 @@ count_in_progress() {
 
 log "=========================================="
 log "Ralph-BMAD Loop Starting"
+log "Branch: $CURRENT_BRANCH"
 log "Max iterations: $MAX_ITERATIONS"
 log "Pending: $(count_pending) | Done: $(count_done) | Blocked: $(count_blocked)"
 log "=========================================="
@@ -170,10 +198,40 @@ while [ "$ITERATION" -lt "$MAX_ITERATIONS" ]; do
         exit 1
     fi
 
-    # Brief pause between iterations (let git settle, avoid rate limits)
-    log "Pausing 3s before next iteration..."
-    sleep 3
+    # Rate limit detection
+    if echo "$OUTPUT" | grep -qi "rate.limit\|429\|usage limit\|too many requests\|overloaded"; then
+        warn "Rate limit detected at iteration $ITERATION. Waiting 5 minutes..."
+        sleep 300
+        ITERATION=$((ITERATION - 1))  # Don't count this iteration
+        continue
+    fi
+
+    # Circuit breaker: detect no-commit stalls
+    CURRENT_COMMIT=$(git rev-parse HEAD)
+    if [ "$CURRENT_COMMIT" = "$LAST_COMMIT" ]; then
+        NO_PROGRESS_COUNT=$((NO_PROGRESS_COUNT + 1))
+        warn "No new commit. Stall count: $NO_PROGRESS_COUNT/$NO_PROGRESS_THRESHOLD"
+        if [ "$NO_PROGRESS_COUNT" -ge "$NO_PROGRESS_THRESHOLD" ]; then
+            error "Circuit breaker: $NO_PROGRESS_THRESHOLD iterations with no commits. Stopping."
+            break
+        fi
+    else
+        NO_PROGRESS_COUNT=0
+        LAST_COMMIT="$CURRENT_COMMIT"
+    fi
+
+    # Fallback push after each iteration (best-effort)
+    git push origin "$CURRENT_BRANCH" 2>/dev/null || true
+
+    # Adaptive pause (3s normal, 10s if stalling)
+    if [ "$NO_PROGRESS_COUNT" -gt 0 ]; then
+        log "Pausing 10s (stall detected)..."
+        sleep 10
+    else
+        log "Pausing 3s before next iteration..."
+        sleep 3
+    fi
 done
 
-warn "Reached max iterations ($MAX_ITERATIONS). $PENDING stories still pending."
+warn "Reached max iterations ($MAX_ITERATIONS). $(count_pending) stories still pending."
 exit 1

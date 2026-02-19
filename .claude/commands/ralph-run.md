@@ -27,6 +27,8 @@ If `sprint-status.yaml` does NOT exist:
 - Output: `<promise>SPRINT_PLANNING_NEEDED</promise>`
 - **EXIT**
 
+**IMPORTANT**: If this project was set up using code.claude.com (browser), ensure the browser session is CLOSED before running the CLI loop. Open browser sessions cause cross-session interference with the CLI.
+
 ---
 
 ## ORIENT Phase
@@ -68,9 +70,16 @@ If `sprint-status.yaml` does NOT exist:
    - Output: <promise>RALPH_BMAD_BLOCKED</promise>
    - **EXIT**
 
+8. **Epic boundary check**: If the previous story was the last in an epic (all stories in that epic are `[x]`):
+   - Log epic completion in `.ralph-progress.md`
+   - Note: "Epic N complete — consider running /bmad:bmm:workflows:retrospective before continuing"
+   - Continue to next story (loop doesn't pause, but the note signals the user)
+
 ---
 
 ## DELEGATE Phase
+
+Before selecting an implementation approach, use the `ralph-explorer` subagent to search the codebase and understand the current implementation state. This keeps file reads out of the orchestrator context.
 
 Determine the implementation approach based on story metadata in `.ralph-plan.md`:
 
@@ -177,6 +186,16 @@ Before proceeding to COMMIT, run final quality gates:
 4. Maximum **2 pre-commit fix cycles** before marking story `[!]`
 
 This is a hard gate — NEVER commit with failing tests or type errors.
+
+### If PRE-COMMIT VERIFICATION Fails Twice
+
+Instead of losing all work by marking `[!]`:
+1. Stage working changes: `git add -A`
+2. Commit as WIP: `git commit -m "wip({story-key}): partial implementation, {what works} — {what fails}"`
+3. Push: `git push`
+4. THEN mark story `[!]` in `.ralph-plan.md` with reason
+5. Log details in `.ralph-progress.md`
+6. Output: `<promise>STORY_COMPLETE</promise>` (so bash loop moves to next story)
 
 ---
 
