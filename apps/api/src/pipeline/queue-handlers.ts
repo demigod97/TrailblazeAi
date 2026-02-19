@@ -6,6 +6,7 @@ import { extractUnitContent } from './stages/extract-content.js';
 import { identifyUnitConcepts } from './stages/identify-concepts.js';
 import { chunkUnitContent } from './stages/chunk-content.js';
 import { generateUnitEmbeddings } from './stages/generate-embeddings.js';
+import { buildUnitRelationships } from './stages/build-relationships.js';
 import { PipelineError, SessionExpiredError } from '../lib/errors.js';
 
 const SCRAPE_MODULE_RETRY_LIMIT = 3;
@@ -183,6 +184,41 @@ export async function registerQueueHandlers(boss: PgBoss): Promise<void> {
       const supabase = createClient(config.supabaseUrl, config.supabaseServiceKey);
       await generateUnitEmbeddings({ unit_id, module_id, run_id }, supabase);
       await (boss as unknown as BossWithSend).send('build-relationships', { unit_id, module_id, run_id });
+    },
+  );
+
+  // Register build-relationships worker → final stage, may transition module to 'ready'
+  await (boss as unknown as BossWithWork).work(
+    'build-relationships',
+    { teamSize: 5, teamConcurrency: 5 },
+    async (job: BossJob) => {
+      const { unit_id, module_id, run_id } = job.data as { unit_id: string; module_id: string; run_id: string | null };
+      const supabase = createClient(config.supabaseUrl, config.supabaseServiceKey);
+      const db = supabase as unknown as PipelineClient;
+
+      await buildUnitRelationships({ unit_id, module_id, run_id }, supabase);
+
+      // Check if all units in module have completed the pipeline
+      // (all chunks have embeddings = all units passed through generate-embeddings + build-relationships)
+      const { data: totalUnits } = await db.from('units').select('id').eq('module_id', module_id);
+      const { data: embeddedChunks } = await db
+        .from('sf_knowledge_chunks')
+        .select('unit_id')
+        .eq('module_id', module_id)
+        .not('embedding', 'is', null);
+
+      const totalCount = totalUnits?.length ?? 0;
+      const embeddedUnitIds = new Set(
+        (embeddedChunks as unknown as Array<{ unit_id: string }>)?.map((c) => c.unit_id) ?? [],
+      );
+
+      if (totalCount > 0 && embeddedUnitIds.size >= totalCount) {
+        // All units have embeddings → all have passed through the full pipeline
+        await db
+          .from('modules')
+          .update({ status: 'ready', updated_at: new Date().toISOString() })
+          .eq('id', module_id);
+      }
     },
   );
 

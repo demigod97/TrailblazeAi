@@ -43,3 +43,30 @@ classify_chunk: |
   - "reference" if it lists API references, field lists, or configuration tables
   - "definition" if it primarily defines a term or concept
   - "explanation" for general explanatory text (default)
+
+build_relationships: |
+  Analyze the following Salesforce concepts extracted from Trailhead learning modules
+  and identify meaningful relationships between them.
+
+  Current unit concepts:
+  {{current_concepts}}
+
+  Other concepts from this module (previously processed units):
+  {{other_concepts}}
+
+  For each relationship found, specify:
+  - source_concept: The concept name (exactly as it appears in the input lists)
+  - target_concept: The concept name (exactly as it appears in the input lists)
+  - relationship_type: One of:
+    - "prerequisite": source_concept must be understood before target_concept
+    - "related_to": concepts are meaningfully related but neither strictly depends on the other
+    - "part_of": source_concept is a component, feature, or subset of target_concept
+  - strength: Confidence score from 0.0 to 1.0
+
+  Rules:
+  - Only include relationships where the connection is meaningful for learning
+  - Prefer specific relationships over vague ones
+  - A concept must not relate to itself
+  - Focus on educational dependencies (what you need to know first)
+  - Include cross-unit relationships when concepts from different units relate
+  - Do NOT create relationships for obvious synonyms or near-duplicates

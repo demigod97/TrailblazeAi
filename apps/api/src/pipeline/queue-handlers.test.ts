@@ -47,6 +47,12 @@ const { mockGenerateUnitEmbeddings } = vi.hoisted(() => {
 });
 vi.mock('./stages/generate-embeddings.js', () => ({ generateUnitEmbeddings: mockGenerateUnitEmbeddings }));
 
+const { mockBuildUnitRelationships } = vi.hoisted(() => {
+  const mockBuildUnitRelationships = vi.fn().mockResolvedValue(undefined);
+  return { mockBuildUnitRelationships };
+});
+vi.mock('./stages/build-relationships.js', () => ({ buildUnitRelationships: mockBuildUnitRelationships }));
+
 import PgBoss from 'pg-boss';
 import { registerQueueHandlers } from './queue-handlers.js';
 import { SessionExpiredError, PipelineError } from '../lib/errors.js';
@@ -54,6 +60,17 @@ import { SessionExpiredError, PipelineError } from '../lib/errors.js';
 describe('Queue Handlers', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Reset mockDbFrom to its default implementation
+    mockDbFrom.mockImplementation((_table: string) => {
+      return {
+        select: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            not: mockDbNot,
+          }),
+        }),
+        update: mockDbUpdate,
+      };
+    });
   });
 
   describe('registerQueueHandlers', () => {
@@ -807,6 +824,201 @@ describe('Queue Handlers', () => {
             data: { unit_id: 'unit-1', module_id: 'module-1', run_id: 'run-1' },
           }),
         ).rejects.toThrow('Embeddings generation failed');
+      }
+    });
+
+    it('registers build-relationships queue worker', async () => {
+      const mockBoss = {
+        work: vi.fn().mockResolvedValue(undefined),
+        send: vi.fn().mockResolvedValue(undefined),
+      };
+
+      await registerQueueHandlers(mockBoss as any);
+
+      const buildRelationshipsCall = mockBoss.work.mock.calls.find((call: unknown[]) => call[0] === 'build-relationships');
+      expect(buildRelationshipsCall).toBeDefined();
+    });
+
+    it('registers build-relationships with teamSize: 5 and teamConcurrency: 5', async () => {
+      const mockBoss = {
+        work: vi.fn().mockResolvedValue(undefined),
+        send: vi.fn().mockResolvedValue(undefined),
+      };
+
+      await registerQueueHandlers(mockBoss as any);
+
+      const buildRelationshipsCall = mockBoss.work.mock.calls.find((call: unknown[]) => call[0] === 'build-relationships');
+      expect(buildRelationshipsCall?.[1]).toEqual({ teamSize: 5, teamConcurrency: 5 });
+    });
+
+    it('build-relationships handler calls buildUnitRelationships with job data', async () => {
+      const handlers: any[] = [];
+      const mockBoss = {
+        work: vi.fn().mockImplementation(async (queue: string, _options: unknown, handler: any) => {
+          handlers.push({ queue, handler });
+        }),
+        send: vi.fn().mockResolvedValue(undefined),
+      };
+
+      await registerQueueHandlers(mockBoss as any);
+
+      const buildRelationshipsHandler = handlers.find((h) => h.queue === 'build-relationships')?.handler;
+      expect(buildRelationshipsHandler).toBeDefined();
+
+      if (buildRelationshipsHandler) {
+        await buildRelationshipsHandler({
+          data: { unit_id: 'unit-1', module_id: 'module-1', run_id: 'run-1' },
+        });
+        expect(mockBuildUnitRelationships).toHaveBeenCalledWith(
+          { unit_id: 'unit-1', module_id: 'module-1', run_id: 'run-1' },
+          expect.anything(),
+        );
+      }
+    });
+
+    it('build-relationships handler rethrows on error', async () => {
+      const testError = new Error('Build relationships failed');
+      mockBuildUnitRelationships.mockRejectedValueOnce(testError);
+
+      const handlers: any[] = [];
+      const mockBoss = {
+        work: vi.fn().mockImplementation(async (queue: string, _options: unknown, handler: any) => {
+          handlers.push({ queue, handler });
+        }),
+        send: vi.fn().mockResolvedValue(undefined),
+      };
+
+      await registerQueueHandlers(mockBoss as any);
+
+      const buildRelationshipsHandler = handlers.find((h) => h.queue === 'build-relationships')?.handler;
+      expect(buildRelationshipsHandler).toBeDefined();
+
+      if (buildRelationshipsHandler) {
+        await expect(
+          buildRelationshipsHandler({
+            data: { unit_id: 'unit-1', module_id: 'module-1', run_id: 'run-1' },
+          }),
+        ).rejects.toThrow('Build relationships failed');
+      }
+    });
+
+    it('build-relationships handler succeeds without error when all db calls succeed', async () => {
+      const handlers: any[] = [];
+      const mockBoss = {
+        work: vi.fn().mockImplementation(async (queue: string, _options: unknown, handler: any) => {
+          handlers.push({ queue, handler });
+        }),
+        send: vi.fn().mockResolvedValue(undefined),
+      };
+
+      await registerQueueHandlers(mockBoss as any);
+
+      const buildRelationshipsHandler = handlers.find((h) => h.queue === 'build-relationships')?.handler;
+      expect(buildRelationshipsHandler).toBeDefined();
+
+      if (buildRelationshipsHandler) {
+        // Should not throw with default mocks
+        await expect(
+          buildRelationshipsHandler({
+            data: { unit_id: 'unit-1', module_id: 'module-1', run_id: 'run-1' },
+          }),
+        ).resolves.not.toThrow();
+      }
+    });
+
+    it('build-relationships handler updates module status to ready when all units have embeddings', async () => {
+      const handlers: any[] = [];
+      const mockUpdateEq = vi.fn().mockResolvedValue({ error: null });
+      const mockModuleUpdate = vi.fn().mockReturnValue({ eq: mockUpdateEq });
+
+      mockDbFrom.mockImplementation((table: string) => {
+        if (table === 'units') {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockResolvedValue({ data: [{ id: 'unit-1' }], error: null }),
+            }),
+          };
+        }
+        if (table === 'sf_knowledge_chunks') {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                not: vi.fn().mockResolvedValue({ data: [{ unit_id: 'unit-1' }], error: null }),
+              }),
+            }),
+          };
+        }
+        // 'modules' and others
+        return { select: vi.fn(), update: mockModuleUpdate };
+      });
+
+      const mockBoss = {
+        work: vi.fn().mockImplementation(async (queue: string, _options: unknown, handler: any) => {
+          handlers.push({ queue, handler });
+        }),
+        send: vi.fn().mockResolvedValue(undefined),
+      };
+
+      await registerQueueHandlers(mockBoss as any);
+
+      const buildRelationshipsHandler = handlers.find((h) => h.queue === 'build-relationships')?.handler;
+      if (buildRelationshipsHandler) {
+        await buildRelationshipsHandler({
+          data: { unit_id: 'unit-1', module_id: 'module-1', run_id: 'run-1' },
+        });
+        expect(mockModuleUpdate).toHaveBeenCalledWith(
+          expect.objectContaining({ status: 'ready' }),
+        );
+      }
+    });
+
+    it('build-relationships handler does NOT update module status when not all units have embeddings', async () => {
+      const handlers: any[] = [];
+      const mockModuleUpdate = vi.fn().mockReturnValue({
+        eq: vi.fn().mockResolvedValue({ error: null }),
+      });
+
+      mockDbFrom.mockImplementation((table: string) => {
+        if (table === 'units') {
+          return {
+            select: vi.fn().mockReturnValue({
+              // 2 total units in module
+              eq: vi.fn().mockResolvedValue({ data: [{ id: 'unit-1' }, { id: 'unit-2' }], error: null }),
+            }),
+          };
+        }
+        if (table === 'sf_knowledge_chunks') {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                // Only 1 unit has embeddings — pipeline not complete
+                not: vi.fn().mockResolvedValue({ data: [{ unit_id: 'unit-1' }], error: null }),
+              }),
+            }),
+          };
+        }
+        return { select: vi.fn(), update: mockModuleUpdate };
+      });
+
+      const mockBoss = {
+        work: vi.fn().mockImplementation(async (queue: string, _options: unknown, handler: any) => {
+          handlers.push({ queue, handler });
+        }),
+        send: vi.fn().mockResolvedValue(undefined),
+      };
+
+      await registerQueueHandlers(mockBoss as any);
+
+      const buildRelationshipsHandler = handlers.find((h) => h.queue === 'build-relationships')?.handler;
+      if (buildRelationshipsHandler) {
+        await buildRelationshipsHandler({
+          data: { unit_id: 'unit-1', module_id: 'module-1', run_id: 'run-1' },
+        });
+        // update should NOT have been called with { status: 'ready' }
+        const readyCalls = (mockModuleUpdate as ReturnType<typeof vi.fn>).mock.calls.filter(
+          (call: any[]) => (call[0] as Record<string, unknown>)?.['status'] === 'ready',
+        );
+        expect(readyCalls.length).toBe(0);
       }
     });
   });

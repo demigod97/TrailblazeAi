@@ -5,7 +5,7 @@ export type ModuleStatus = 'pending' | 'scraping' | 'scraped' | 'processing' | '
 export type RunStatus = 'active' | 'paused' | 'cancelled' | 'completed' | 'failed';
 export type UnitType = 'reading' | 'hands_on' | 'quiz';
 export type QuestionType = 'multiple_choice' | 'true_false' | 'short_answer';
-export type RelationshipType = 'prerequisite' | 'related' | 'contradicts' | 'clarifies' | 'extends';
+export type RelationshipType = 'prerequisite' | 'related' | 'related_to' | 'part_of' | 'contradicts' | 'clarifies' | 'extends';
 export type AgentType = 'scraper' | 'knowledge' | 'quiz' | 'documentation';
 export type ToolType = 'playwright_mcp' | 'rag_search' | 'llm_call' | 'embedding' | 'sf_mcp' | 'stagehand';
 
@@ -80,10 +80,13 @@ export interface SfKnowledgeChunk {
 
 export interface SfConceptRelationship {
   id: string;
-  source_chunk_id: string;
-  target_chunk_id: string;
+  source_chunk_id: string | null;
+  target_chunk_id: string | null;
   relationship_type: RelationshipType;
   strength: number;
+  source_concept: string | null;
+  target_concept: string | null;
+  module_id: string | null;
   created_at: string;
 }
 

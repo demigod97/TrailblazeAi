@@ -15,12 +15,14 @@ export interface KnowledgePrompts {
   system: string;
   identify_concepts: string;
   classify_chunk: string;
+  build_relationships?: string;
 }
 
 const promptSchema = z.object({
   system: z.string(),
   identify_concepts: z.string(),
   classify_chunk: z.string(),
+  build_relationships: z.string().optional(),
 });
 
 let cachedPrompts: KnowledgePrompts | null = null;
