@@ -175,7 +175,8 @@ while [ "$ITERATION" -lt "$MAX_ITERATIONS" ]; do
     # Run claude with the ralph-run skill
     # --dangerously-skip-permissions: allow autonomous execution
     # --print: output to stdout (captured)
-    if claude --dangerously-skip-permissions --print "/ralph-run" > "$OUTPUT_FILE" 2>&1; then
+    # ANTHROPIC_API_KEY is unset so CLI uses OAuth (claude login), not the app's API key
+    if ANTHROPIC_API_KEY= claude --dangerously-skip-permissions --print "/ralph-run" > "$OUTPUT_FILE" 2>&1; then
         log "Claude Code session completed successfully"
     else
         warn "Claude Code session exited with non-zero status"

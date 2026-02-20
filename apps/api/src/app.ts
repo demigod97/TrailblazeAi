@@ -9,6 +9,7 @@ import { trailmixRoutes } from './routes/trailmix.js';
 import { modulesRoutes } from './routes/modules.js';
 import { knowledgeRoutes } from './routes/knowledge.js';
 import quizResultsRoutes from './routes/quiz-results.js';
+import { pipelineRoutes } from './routes/pipeline.js';
 import { registerQueueHandlers } from './pipeline/queue-handlers.js';
 
 export async function buildApp(opts?: FastifyServerOptions) {
@@ -35,6 +36,7 @@ export async function buildApp(opts?: FastifyServerOptions) {
   await app.register(modulesRoutes);
   await app.register(knowledgeRoutes);
   await app.register(quizResultsRoutes);
+  await app.register(pipelineRoutes);
 
   // Set global error handler
   errorHandlerSetup(app);
