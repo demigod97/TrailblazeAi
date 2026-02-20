@@ -3,6 +3,19 @@ import Fastify from 'fastify';
 import { bearerAuth } from '../plugins/auth.js';
 import { pgBossPlugin } from '../plugins/pg-boss.js';
 
+// Hoisted: tracked mocks so tests can assert on DB calls from within the createClient factory
+const { mockRunsUpdate, mockModulesUpdate } = vi.hoisted(() => {
+  const mockRunsUpdate = vi.fn().mockReturnValue({
+    eq: vi.fn().mockResolvedValue({ data: null, error: null }),
+  });
+  const mockModulesUpdate = vi.fn().mockReturnValue({
+    eq: vi.fn().mockResolvedValue({ error: null }),
+    neq: vi.fn().mockResolvedValue({ error: null }),
+    not: vi.fn().mockResolvedValue({ error: null }),
+  });
+  return { mockRunsUpdate, mockModulesUpdate };
+});
+
 // Mock config
 vi.mock('../config.js', () => ({
   config: {
@@ -48,13 +61,6 @@ vi.mock('@trailblaze/db', () => ({
       }),
     });
 
-    const modulesUpdateMock = vi.fn().mockReturnValue({
-      eq: vi.fn().mockResolvedValue({
-        data: [],
-        error: null,
-      }),
-    });
-
     return {
       from: vi.fn((table: string) => {
         if (table === 'pipeline_config') {
@@ -68,29 +74,18 @@ vi.mock('@trailblaze/db', () => ({
         }
         if (table === 'runs') {
           return {
+            // Implementation uses .eq() for single-status lookups, .in() for multi-status
             select: vi.fn().mockReturnValue({
-              eq: vi.fn().mockReturnValue({
-                order: vi.fn().mockReturnValue({
-                  limit: vi.fn().mockResolvedValue({
-                    data: [mockActiveRun],
-                    error: null,
-                  }),
-                }),
-              }),
+              eq: vi.fn().mockResolvedValue({ data: [mockActiveRun], error: null }),
+              in: vi.fn().mockResolvedValue({ data: [mockActiveRun], error: null }),
             }),
-            update: updateMock,
+            update: mockRunsUpdate,
           };
         }
         if (table === 'modules') {
           return {
-            select: vi.fn().mockResolvedValue({
-              data: [
-                { id: 'module-1', track: 'Admin' },
-                { id: 'module-2', track: 'Developer' },
-              ],
-              error: null,
-            }),
-            update: modulesUpdateMock,
+            // Implementation now uses bulk eq/neq/not — no select needed
+            update: mockModulesUpdate,
           };
         }
         return {
@@ -215,9 +210,9 @@ describe('Pipeline routes', () => {
       expect(body.data).toBeDefined();
       expect(body.error).toBe(null);
 
-      // Verify that module update was called
-      const { createClient } = await import('@trailblaze/db');
-      expect(createClient).toHaveBeenCalled();
+      // Verify bulk module priority updates: priority=1 for matching track, priority=5 for non-matching
+      expect(mockModulesUpdate).toHaveBeenCalledWith({ priority: 1 });
+      expect(mockModulesUpdate).toHaveBeenCalledWith({ priority: 5 });
 
       await app.close();
     });
@@ -248,6 +243,9 @@ describe('Pipeline routes', () => {
       expect(mockBoss.pause).toHaveBeenCalledWith('answer-quiz');
       expect(mockBoss.pause).toHaveBeenCalledWith('submit-quiz');
 
+      // Verify active run status was updated to 'paused'
+      expect(mockRunsUpdate).toHaveBeenCalledWith({ status: 'paused' });
+
       await app.close();
     });
   });
@@ -277,6 +275,9 @@ describe('Pipeline routes', () => {
       expect(mockBoss.resume).toHaveBeenCalledWith('answer-quiz');
       expect(mockBoss.resume).toHaveBeenCalledWith('submit-quiz');
 
+      // Verify active run status was updated to 'active'
+      expect(mockRunsUpdate).toHaveBeenCalledWith({ status: 'active' });
+
       await app.close();
     });
   });
@@ -297,6 +298,9 @@ describe('Pipeline routes', () => {
 
       // Verify boss.pause was called for all 8 queues
       expect(mockBoss.pause).toHaveBeenCalledTimes(8);
+
+      // Verify active run status was updated to 'cancelled'
+      expect(mockRunsUpdate).toHaveBeenCalledWith({ status: 'cancelled' });
 
       await app.close();
     });

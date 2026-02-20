@@ -70,6 +70,6 @@ development_status:
 
   # Epic 5: Pipeline Operations & Monitoring
   epic-5: in-progress
-  5-1-pipeline-configuration-and-run-control: in-progress
+  5-1-pipeline-configuration-and-run-control: done
   5-2-aggregated-progress-and-cost-tracking: backlog
   epic-5-retrospective: optional

@@ -19,14 +19,11 @@ const PIPELINE_QUEUES = [
   'submit-quiz',
 ] as const;
 
-// Structural type for pipeline config DB operations
+// Structural type for pipeline config DB operations (GET and PATCH)
 type PipelineConfigClient = {
   from(table: string): {
     select(cols: string): {
       eq?(col: string, val: unknown): Promise<{ data: Array<unknown> | null; error: { message: string } | null }>;
-      order?(col: string, opts: { ascending: boolean }): {
-        limit?(n: number): Promise<{ data: Array<unknown> | null; error: { message: string } | null }>;
-      };
     } & Promise<{ data: Array<unknown> | null; error: { message: string } | null }>;
     update(data: Record<string, unknown>): {
       eq(col: string, val: unknown): Promise<{ data: Array<unknown> | null; error: { message: string } | null }>;
@@ -38,6 +35,36 @@ type PipelineConfigClient = {
 type BossWithPauseResume = {
   pause(name: string): Promise<void>;
   resume(name: string): Promise<void>;
+};
+
+// Structural type for updateModulePriorities — bulk UPDATE with eq/neq/not filters
+type ModulePriorityClient = {
+  from(table: string): {
+    update(data: Record<string, unknown>): {
+      eq(col: string, val: unknown): Promise<{ error: { message: string } | null }>;
+      neq(col: string, val: unknown): Promise<{ error: { message: string } | null }>;
+      not(col: string, op: string, val: unknown): Promise<{ error: { message: string } | null }>;
+    };
+  };
+};
+
+// Structural type for updateRunStatus — supports both .eq() and .in() for run lookups
+type RunStatusClient = {
+  from(table: string): {
+    select(cols: string): {
+      eq(col: string, val: unknown): Promise<{
+        data: Array<{ id: string }> | null;
+        error: { message: string } | null;
+      }>;
+      in(col: string, vals: unknown[]): Promise<{
+        data: Array<{ id: string }> | null;
+        error: { message: string } | null;
+      }>;
+    };
+    update(data: Record<string, unknown>): {
+      eq(col: string, val: unknown): Promise<{ error: { message: string } | null }>;
+    };
+  };
 };
 
 // Zod schemas
@@ -52,60 +79,60 @@ type PipelineConfig = z.infer<typeof patchConfigSchema>;
 const CONFIG_ID = '00000000-0000-0000-0000-000000000001';
 
 /**
- * Helper: Update module priorities based on priority_track
- * If track is set: modules matching track get priority=1, others get priority=5
- * If track is null: all modules get priority=5 (reset)
+ * Helper: Update module priorities based on priority_track using two bulk UPDATE queries.
+ * If track is set: matching modules → priority 1, non-matching → priority 5.
+ * If track is null: all modules → priority 5 (reset).
  */
 async function updateModulePriorities(track: string | null): Promise<void> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const supabase = createClient(config.supabaseUrl, config.supabaseServiceKey) as any;
+  const supabase = createClient(config.supabaseUrl, config.supabaseServiceKey) as unknown as ModulePriorityClient;
 
   if (track !== null) {
-    // Update matching track to priority 1
-    await supabase.from('modules').update({ priority: 1 }).eq('track', track);
-  }
+    // Bulk UPDATE: matching track → priority 1
+    const { error: err1 } = await supabase.from('modules').update({ priority: 1 }).eq('track', track);
+    if (err1) throw new Error(`Failed to set priority 1: ${err1.message}`);
 
-  // Update all other modules to priority 5 (via select and individual updates)
-  const selectResult = await supabase.from('modules').select('id,track');
-  const allModules = selectResult.data as unknown as Array<{ id: string; track: string | null }> | null;
-
-  if (allModules && allModules.length > 0) {
-    for (const module of allModules) {
-      if (track === null || module.track !== track) {
-        await supabase.from('modules').update({ priority: 5 }).eq('id', module.id);
-      }
-    }
+    // Bulk UPDATE: non-matching track → priority 5
+    const { error: err2 } = await supabase.from('modules').update({ priority: 5 }).neq('track', track);
+    if (err2) throw new Error(`Failed to set priority 5: ${err2.message}`);
+  } else {
+    // Bulk UPDATE: reset all modules to priority 5 (no priority track selected)
+    const { error } = await supabase.from('modules').update({ priority: 5 }).not('id', 'is', null);
+    if (error) throw new Error(`Failed to reset module priorities: ${error.message}`);
   }
 }
 
 /**
- * Helper: Update run status (for pause/resume/cancel)
+ * Helper: Update run status for pause/resume/cancel operations.
+ * @param newStatus - The new status to set on the matching run
+ * @param fromStatuses - Which run statuses to search (default: ['active'] for pause)
+ *   - pause: ['active'] — only pause active runs
+ *   - resume/cancel: ['active', 'paused'] — also catches runs already in paused state
  */
-async function updateRunStatus(status: 'active' | 'paused' | 'cancelled'): Promise<void> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const supabase = createClient(config.supabaseUrl, config.supabaseServiceKey) as any;
+async function updateRunStatus(
+  newStatus: 'active' | 'paused' | 'cancelled',
+  fromStatuses: ('active' | 'paused')[] = ['active'],
+): Promise<void> {
+  const supabase = createClient(config.supabaseUrl, config.supabaseServiceKey) as unknown as RunStatusClient;
 
-  // Find active run
-  const { data: runs, error: selectError } = await supabase
-    .from('runs')
-    .select('id')
-    .eq('status', 'active');
+  // Find matching run using .in() when multiple statuses, .eq() for single status
+  const selectQuery = supabase.from('runs').select('id');
+  const { data: runs, error: selectError } =
+    fromStatuses.length === 1
+      ? await selectQuery.eq('status', fromStatuses[0])
+      : await selectQuery.in('status', fromStatuses);
 
-  if (selectError) throw new Error(`Failed to fetch active run: ${selectError.message}`);
+  if (selectError) throw new Error(`Failed to fetch run: ${selectError.message}`);
 
-  const runList = runs as unknown as Array<{ id: string }> | null;
-  if (runList && runList.length > 0) {
-    const activeRunId = runList[0]?.id;
-    if (activeRunId) {
-      const { error: updateError } = await supabase.from('runs').update({ status }).eq('id', activeRunId);
-      if (updateError) throw new Error(`Failed to update run status: ${updateError.message}`);
-    }
+  const runId = (runs as Array<{ id: string }> | null)?.[0]?.id;
+  if (runId) {
+    const { error: updateError } = await supabase.from('runs').update({ status: newStatus }).eq('id', runId);
+    if (updateError) throw new Error(`Failed to update run status: ${updateError.message}`);
   }
 
-  // Update pipeline_config status
+  // Sync pipeline_config.pipeline_paused with the new status
   const { error: configError } = await supabase
     .from('pipeline_config')
-    .update({ pipeline_paused: status === 'paused' })
+    .update({ pipeline_paused: newStatus === 'paused' })
     .eq('id', CONFIG_ID);
   if (configError) throw new Error(`Failed to update pipeline_config: ${configError.message}`);
 }
@@ -122,7 +149,7 @@ export const pipelineRoutes: FastifyPluginAsync = fp(async (app) => {
         const { data, error: err } = await db.from('pipeline_config').select('*');
         if (err) throw new Error(err.message);
 
-        // Return first row (single-row config pattern)
+        // Single-row config pattern — return first row
         const row = data?.[0];
         return reply.send(success(row ?? null) as unknown as ApiResponse<Record<string, unknown>>);
       } catch (err) {
@@ -146,16 +173,20 @@ export const pipelineRoutes: FastifyPluginAsync = fp(async (app) => {
         const supabase = createClient(config.supabaseUrl, config.supabaseServiceKey);
         const db = supabase as unknown as PipelineConfigClient;
 
-        // Prepare update data
         const updateData = {
           ...parsed.data,
           updated_at: new Date().toISOString(),
         };
 
-        const { data, error: err } = await db.from('pipeline_config').update(updateData).eq('id', CONFIG_ID);
-        if (err) throw new Error(err.message);
+        // Supabase UPDATE does not return row data without .select() — apply update then re-fetch
+        const { error: updateErr } = await db.from('pipeline_config').update(updateData).eq('id', CONFIG_ID);
+        if (updateErr) throw new Error(updateErr.message);
 
-        // If priority_track changed, update module priorities
+        // Re-fetch to return the actual updated config
+        const { data, error: fetchErr } = await db.from('pipeline_config').select('*');
+        if (fetchErr) throw new Error(fetchErr.message);
+
+        // If priority_track changed, update module priorities in bulk
         if ('priority_track' in parsed.data && parsed.data.priority_track !== undefined) {
           await updateModulePriorities(parsed.data.priority_track ?? null);
         }
@@ -179,13 +210,12 @@ export const pipelineRoutes: FastifyPluginAsync = fp(async (app) => {
       try {
         const boss = (app as unknown as { boss: BossWithPauseResume }).boss;
 
-        // Pause all queues
         for (const queueName of PIPELINE_QUEUES) {
           await boss.pause(queueName);
         }
 
-        // Update run status and pipeline_config
-        await updateRunStatus('paused');
+        // Only pause active runs (not already-paused runs)
+        await updateRunStatus('paused', ['active']);
 
         return reply.send(success({ paused: true }));
       } catch (err) {
@@ -203,13 +233,12 @@ export const pipelineRoutes: FastifyPluginAsync = fp(async (app) => {
       try {
         const boss = (app as unknown as { boss: BossWithPauseResume }).boss;
 
-        // Resume all queues
         for (const queueName of PIPELINE_QUEUES) {
           await boss.resume(queueName);
         }
 
-        // Update run status and pipeline_config
-        await updateRunStatus('active');
+        // Resume from active OR paused state (idempotent)
+        await updateRunStatus('active', ['active', 'paused']);
 
         return reply.send(success({ resumed: true }));
       } catch (err) {
@@ -227,13 +256,12 @@ export const pipelineRoutes: FastifyPluginAsync = fp(async (app) => {
       try {
         const boss = (app as unknown as { boss: BossWithPauseResume }).boss;
 
-        // Pause all queues
         for (const queueName of PIPELINE_QUEUES) {
           await boss.pause(queueName);
         }
 
-        // Update run status to cancelled (modules stay at current status)
-        await updateRunStatus('cancelled');
+        // Cancel from active OR paused state — modules stay at their current status
+        await updateRunStatus('cancelled', ['active', 'paused']);
 
         return reply.send(success({ cancelled: true }));
       } catch (err) {
