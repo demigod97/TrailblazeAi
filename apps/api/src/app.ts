@@ -8,6 +8,7 @@ import { healthRoute } from './routes/health.js';
 import { trailmixRoutes } from './routes/trailmix.js';
 import { modulesRoutes } from './routes/modules.js';
 import { knowledgeRoutes } from './routes/knowledge.js';
+import quizResultsRoutes from './routes/quiz-results.js';
 import { registerQueueHandlers } from './pipeline/queue-handlers.js';
 
 export async function buildApp(opts?: FastifyServerOptions) {
@@ -33,6 +34,7 @@ export async function buildApp(opts?: FastifyServerOptions) {
   await app.register(trailmixRoutes);
   await app.register(modulesRoutes);
   await app.register(knowledgeRoutes);
+  await app.register(quizResultsRoutes);
 
   // Set global error handler
   errorHandlerSetup(app);
