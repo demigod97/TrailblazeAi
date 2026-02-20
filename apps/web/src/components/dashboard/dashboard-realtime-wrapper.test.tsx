@@ -30,6 +30,7 @@ vi.mock('sonner', () => ({
   toast: {
     error: vi.fn(),
     dismiss: vi.fn(),
+    success: vi.fn(),
   },
 }));
 
@@ -88,7 +89,7 @@ describe('DashboardRealtimeWrapper', () => {
       })),
       removeChannel: vi.fn(),
     };
-    vi.mocked(createClient).mockReturnValue(mockClient as any);
+    vi.mocked(createClient).mockReturnValue(mockClient as unknown as ReturnType<typeof createClient>);
 
     render(
       <DashboardRealtimeWrapper trailmixId="test-trailmix-123">
@@ -113,7 +114,7 @@ describe('DashboardRealtimeWrapper', () => {
       })),
       removeChannel: vi.fn(),
     };
-    vi.mocked(createClient).mockReturnValue(mockClient as any);
+    vi.mocked(createClient).mockReturnValue(mockClient as unknown as ReturnType<typeof createClient>);
 
     render(
       <DashboardRealtimeWrapper trailmixId="test-id">
@@ -138,8 +139,9 @@ describe('DashboardRealtimeWrapper', () => {
   it('calls router.refresh() when postgres_changes event fires', async () => {
     const { createClient } = await import('@/lib/supabase/client');
     let capturedCallback: ((...args: unknown[]) => void) | null = null;
-    const mockOn = vi.fn((event: string, _opts: unknown, callback: (...args: unknown[]) => void) => {
-      if (event === 'postgres_changes') {
+    const mockOn = vi.fn((event: string, opts: { event?: string } | unknown, callback: (...args: unknown[]) => void) => {
+      // Capture only the status channel callback (event: '*') for router.refresh assertion
+      if (event === 'postgres_changes' && (opts as { event?: string }).event === '*') {
         capturedCallback = callback;
       }
       return {
@@ -153,7 +155,7 @@ describe('DashboardRealtimeWrapper', () => {
       })),
       removeChannel: vi.fn(),
     };
-    vi.mocked(createClient).mockReturnValue(mockClient as any);
+    vi.mocked(createClient).mockReturnValue(mockClient as unknown as ReturnType<typeof createClient>);
 
     render(
       <DashboardRealtimeWrapper trailmixId="test-id">
@@ -195,7 +197,7 @@ describe('DashboardRealtimeWrapper', () => {
       })),
       removeChannel: mockRemoveChannel,
     };
-    vi.mocked(createClient).mockReturnValue(mockClient as any);
+    vi.mocked(createClient).mockReturnValue(mockClient as unknown as ReturnType<typeof createClient>);
 
     const { unmount } = render(
       <DashboardRealtimeWrapper trailmixId="test-id">
@@ -226,7 +228,7 @@ describe('DashboardRealtimeWrapper', () => {
       })),
       removeChannel: mockRemoveChannel,
     };
-    vi.mocked(createClient).mockReturnValue(mockClient as any);
+    vi.mocked(createClient).mockReturnValue(mockClient as unknown as ReturnType<typeof createClient>);
 
     const { unmount } = render(
       <DashboardRealtimeWrapper trailmixId="test-id">
@@ -235,13 +237,14 @@ describe('DashboardRealtimeWrapper', () => {
     );
 
     await waitFor(() => {
-      expect(mockClient.channel).toHaveBeenCalledTimes(1);
+      // Two channels are created: status channel and badge notification channel
+      expect(mockClient.channel).toHaveBeenCalledTimes(2);
     });
 
     unmount();
 
     await waitFor(() => {
-      expect(mockRemoveChannel).toHaveBeenCalledTimes(1);
+      expect(mockRemoveChannel).toHaveBeenCalledTimes(2);
     });
   });
 
@@ -297,5 +300,44 @@ describe('DashboardRealtimeWrapper', () => {
     await waitFor(() => {
       expect(vi.mocked(toast.dismiss)).toHaveBeenCalledWith('session-expired');
     });
+  });
+
+  it('calls toast.success when badge_earned transitions to true (AC3)', async () => {
+    const { createClient } = await import('@/lib/supabase/client');
+    const { toast } = await import('sonner');
+    let badgeCallback: ((payload: unknown) => void) | null = null;
+
+    const mockOn = vi.fn((event: string, opts: { event?: string } | unknown, callback: (payload: unknown) => void) => {
+      if (event === 'postgres_changes' && (opts as { event?: string }).event === 'UPDATE') {
+        badgeCallback = callback;
+      }
+      return { subscribe: vi.fn() };
+    });
+    const mockClient = {
+      channel: vi.fn(() => ({
+        on: mockOn,
+        subscribe: vi.fn(),
+      })),
+      removeChannel: vi.fn(),
+    };
+    vi.mocked(createClient).mockReturnValue(mockClient as unknown as ReturnType<typeof createClient>);
+
+    render(
+      <DashboardRealtimeWrapper trailmixId="test-id">
+        <div>Content</div>
+      </DashboardRealtimeWrapper>,
+    );
+
+    await waitFor(() => {
+      expect(badgeCallback).not.toBeNull();
+    });
+
+    // Simulate badge_earned transitioning from false → true
+    badgeCallback!({ new: { badge_earned: true, name: 'Test Module' }, old: { badge_earned: false } });
+
+    expect(vi.mocked(toast.success)).toHaveBeenCalledWith(
+      'Badge earned: Test Module',
+      expect.objectContaining({ duration: 3000 }),
+    );
   });
 });

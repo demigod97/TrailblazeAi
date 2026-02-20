@@ -20,7 +20,9 @@ export function DashboardRealtimeWrapper({ trailmixId, sessionExpired = false, c
     }
 
     const supabase = createClient();
-    const channel = supabase
+
+    // Subscribe to all module changes for dashboard refresh
+    const statusChannel = supabase
       .channel(`module-status-${trailmixId}`)
       .on(
         'postgres_changes',
@@ -36,9 +38,31 @@ export function DashboardRealtimeWrapper({ trailmixId, sessionExpired = false, c
       )
       .subscribe();
 
-    // Cleanup subscription on unmount or when trailmixId changes
+    // Subscribe to badge_earned events for toast notifications (AC3)
+    const badgeChannel = supabase
+      .channel(`badge-notifications-${trailmixId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'modules',
+          filter: `trailmix_id=eq.${trailmixId}`,
+        },
+        (payload) => {
+          const newRow = payload.new as { badge_earned?: boolean; name?: string };
+          const oldRow = payload.old as { badge_earned?: boolean };
+          if (newRow.badge_earned === true && oldRow.badge_earned !== true) {
+            toast.success(`Badge earned: ${newRow.name ?? 'Module'}`, { duration: 3000 });
+          }
+        },
+      )
+      .subscribe();
+
+    // Cleanup subscriptions on unmount or when trailmixId changes
     return () => {
-      supabase.removeChannel(channel);
+      supabase.removeChannel(statusChannel);
+      supabase.removeChannel(badgeChannel);
     };
   }, [trailmixId, router]);
 

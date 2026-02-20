@@ -357,4 +357,97 @@ describe('ReviewPanel', () => {
       expect(mockRefresh).toHaveBeenCalled();
     }, { timeout: 600 });
   });
+
+  it('Test 9: ReviewPanel shows "Submit to Trailhead" button when module is complete (all approved)', async () => {
+    mockFrom.mockReturnValue({
+      select: vi.fn().mockReturnValue({
+        is: vi.fn().mockReturnValue({
+          order: vi.fn().mockResolvedValue({
+            data: [mockResult],
+            error: null,
+          }),
+        }),
+      }),
+      update: vi.fn().mockReturnValue({
+        eq: vi.fn().mockResolvedValue({ error: null }),
+      }),
+    });
+
+    render(
+      <div>
+        <ReviewPanel />
+      </div>
+    );
+
+    // Wait for question to render
+    await waitFor(() => {
+      expect(screen.queryByText('What is X?')).toBeTruthy();
+    }, { timeout: 600 });
+
+    // Click Approve to complete the module
+    const approveButton = screen.getByRole('button', { name: /approve/i });
+    fireEvent.click(approveButton);
+
+    // Wait for "Submit to Trailhead" button to appear
+    await waitFor(() => {
+      expect(screen.queryByRole('button', { name: /submit to trailhead/i })).toBeTruthy();
+    }, { timeout: 600 });
+  });
+
+  it('Test 10: ReviewPanel calls POST /api/quiz-results/submit on Submit button click', async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ success: true, data: { queued: true } }),
+    });
+    global.fetch = mockFetch;
+
+    mockFrom.mockReturnValue({
+      select: vi.fn().mockReturnValue({
+        is: vi.fn().mockReturnValue({
+          order: vi.fn().mockResolvedValue({
+            data: [mockResult],
+            error: null,
+          }),
+        }),
+      }),
+      update: vi.fn().mockReturnValue({
+        eq: vi.fn().mockResolvedValue({ error: null }),
+      }),
+    });
+
+    render(
+      <div>
+        <ReviewPanel />
+      </div>
+    );
+
+    // Wait for question to render
+    await waitFor(() => {
+      expect(screen.queryByText('What is X?')).toBeTruthy();
+    }, { timeout: 600 });
+
+    // Click Approve to complete the module
+    const approveButton = screen.getByRole('button', { name: /approve/i });
+    fireEvent.click(approveButton);
+
+    // Wait for Submit button
+    await waitFor(() => {
+      expect(screen.queryByRole('button', { name: /submit to trailhead/i })).toBeTruthy();
+    }, { timeout: 600 });
+
+    // Click Submit
+    const submitButton = screen.getByRole('button', { name: /submit to trailhead/i });
+    fireEvent.click(submitButton);
+
+    // Verify fetch was called with correct endpoint and module_id
+    await waitFor(() => {
+      expect(mockFetch).toHaveBeenCalledWith(
+        expect.stringContaining('/api/quiz-results/submit'),
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({ module_id: 'mod-1' }),
+        }),
+      );
+    }, { timeout: 600 });
+  });
 });

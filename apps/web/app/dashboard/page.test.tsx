@@ -110,12 +110,12 @@ beforeEach(() => {
 });
 
 describe('DashboardPage', () => {
-  it('renders 4 StatCards when modules are loaded', async () => {
+  it('renders 5 StatCards when modules are loaded', async () => {
     const jsx = await DashboardPage();
     render(jsx);
 
     const cards = screen.getAllByTestId('stat-card');
-    expect(cards).toHaveLength(4);
+    expect(cards).toHaveLength(5);
   });
 
   it('renders Total Modules StatCard with correct count', async () => {
@@ -235,5 +235,28 @@ describe('DashboardPage', () => {
     render(jsx);
 
     expect(screen.getByTestId('realtime-wrapper')).toHaveAttribute('data-session-expired', 'true');
+  });
+
+  it('renders Badges Earned StatCard with correct count', async () => {
+    const modulesWithBadges = [
+      makeModule({ id: '1', name: 'Module 1', status: 'completed', badge_earned: true }),
+      makeModule({ id: '2', name: 'Module 2', status: 'completed', badge_earned: true }),
+      makeModule({ id: '3', name: 'Module 3', status: 'ready', badge_earned: false }),
+    ];
+
+    // Use direct mockSupabase.from override (prior test may have replaced the from reference)
+    mockSupabase.from = vi.fn((table: string) => {
+      if (table === 'runs') return makeChain({ data: { trailmix_id: 'trailmix-1' }, error: null });
+      if (table === 'modules') return makeChain({ data: modulesWithBadges, error: null });
+      return makeChain({ data: null, error: null });
+    });
+
+    const jsx = await DashboardPage();
+    render(jsx);
+
+    const cards = screen.getAllByTestId('stat-card');
+    const badgesCard = cards.find((c) => c.getAttribute('data-label') === 'Badges Earned');
+    expect(badgesCard).toBeDefined();
+    expect(badgesCard!.textContent).toBe('2');
   });
 });

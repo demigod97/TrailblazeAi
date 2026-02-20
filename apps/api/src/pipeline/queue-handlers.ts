@@ -8,6 +8,7 @@ import { chunkUnitContent } from './stages/chunk-content.js';
 import { generateUnitEmbeddings } from './stages/generate-embeddings.js';
 import { buildUnitRelationships } from './stages/build-relationships.js';
 import { answerModuleQuiz } from '../agents/quiz-agent.js';
+import { submitModuleAnswers } from './stages/submit-answers.js';
 import { PipelineError, SessionExpiredError } from '../lib/errors.js';
 
 const SCRAPE_MODULE_RETRY_LIMIT = 3;
@@ -231,6 +232,35 @@ export async function registerQueueHandlers(boss: PgBoss): Promise<void> {
       const { module_id, run_id } = job.data as { module_id: string; run_id: string | null };
       const supabase = createClient(config.supabaseUrl, config.supabaseServiceKey);
       await answerModuleQuiz({ module_id, run_id }, supabase);
+    },
+  );
+
+  // Register submit-quiz worker — submits approved answers to Trailhead via Playwright MCP (AC1, AC4)
+  await (boss as unknown as BossWithWork).work(
+    'submit-quiz',
+    { teamSize: 1, teamConcurrency: 1 },
+    async (job: BossJob) => {
+      const { module_id, run_id } = job.data as { module_id: string; run_id: string | null };
+      const supabase = createClient(config.supabaseUrl, config.supabaseServiceKey);
+      await submitModuleAnswers({ module_id, run_id }, supabase);
+    },
+  );
+
+  // Register dead-letter-submit-quiz handler — fires after all submit-quiz retries exhausted
+  await (boss as unknown as BossWithWork).work(
+    'dead-letter-submit-quiz',
+    { teamSize: 1, teamConcurrency: 1 },
+    async (job: BossJob) => {
+      const { module_id } = job.data as { module_id: string; run_id: string | null };
+      const supabase = createClient(config.supabaseUrl, config.supabaseServiceKey);
+      const db = supabase as unknown as PipelineClient;
+      const { error: updateError } = await db
+        .from('modules')
+        .update({ status: 'quizzing', failure_reason: 'submit_exhausted', updated_at: new Date().toISOString() })
+        .eq('id', module_id);
+      if (updateError) {
+        throw new PipelineError('dead-letter-submit-quiz', `Failed to reset module status: ${updateError.message}`);
+      }
     },
   );
 

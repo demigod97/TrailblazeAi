@@ -32,13 +32,13 @@ describe('pg-boss Plugin', () => {
     expect(app.boss).toBeDefined();
   });
 
-  it('should initialize with all 7 queue configurations', async () => {
+  it('should initialize with all 8 queue configurations', async () => {
     const app = Fastify({ logger: false });
     await app.register(pgBossPlugin);
 
     expect(app.boss).toBeDefined();
     expect(app.boss.start).toHaveBeenCalled();
-    expect(app.boss.createQueue).toHaveBeenCalledTimes(7);
+    expect(app.boss.createQueue).toHaveBeenCalledTimes(8);
 
     const calls = vi.mocked(app.boss.createQueue).mock.calls as Array<[string, ...unknown[]]>;
     const queueNames = calls.map(([name]) => name);
@@ -49,6 +49,7 @@ describe('pg-boss Plugin', () => {
     expect(queueNames).toContain('generate-embeddings');
     expect(queueNames).toContain('build-relationships');
     expect(queueNames).toContain('answer-quiz');
+    expect(queueNames).toContain('submit-quiz');
   });
 
   it('should call boss.start() during registration', async () => {

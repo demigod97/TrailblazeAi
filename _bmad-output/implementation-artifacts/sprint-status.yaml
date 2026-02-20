@@ -62,10 +62,10 @@ development_status:
   epic-3-retrospective: optional
 
   # Epic 4: Quiz Automation & Review
-  epic-4: in-progress
+  epic-4: done
   4-1-quiz-agent-with-chain-of-thought-reasoning: done
   4-2-quiz-review-panel-with-approve-edit-workflow: done
-  4-3-answer-submission-and-badge-tracking: backlog
+  4-3-answer-submission-and-badge-tracking: done
   epic-4-retrospective: optional
 
   # Epic 5: Pipeline Operations & Monitoring

@@ -30,6 +30,7 @@ export const pgBossPlugin = fp(
       { name: 'generate-embeddings', retryLimit: 3, retryBackoff: true, expireInMinutes: 15 },
       { name: 'build-relationships', retryLimit: 2, retryBackoff: true, expireInHours: 0.5 },
       { name: 'answer-quiz', retryLimit: 2, retryBackoff: true, expireInHours: 0.5 },
+      { name: 'submit-quiz', retryLimit: 2, retryBackoff: true, expireInHours: 1 },
     ];
 
     for (const queue of queueConfigs) {

@@ -102,6 +102,8 @@ export default async function DashboardPage() {
   const completedCount = moduleList.filter((m) => m.status === 'completed').length;
   const estimatedMinutes = moduleList.reduce((sum, m) => sum + (m.estimated_minutes ?? 0), 0);
 
+  const badgeCount = moduleList.filter((m) => m.badge_earned).length;
+
   const statCounts = {
     all: totalCount,
     active: activeCount,
@@ -132,10 +134,11 @@ export default async function DashboardPage() {
             </div>
 
             {/* Stat Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
               <StatCard label="Total Modules" value={totalCount} />
               <StatCard label="Active" value={activeCount} />
               <StatCard label="Completed" value={completedCount} />
+              <StatCard label="Badges Earned" value={badgeCount} />
               <StatCard label="Estimated Time" value={formatEstimatedTime(estimatedMinutes)} />
             </div>
 

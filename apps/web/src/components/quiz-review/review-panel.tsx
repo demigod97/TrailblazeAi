@@ -84,6 +84,7 @@ export function ReviewPanel() {
   const [approvedCount, setApprovedCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [isComplete, setIsComplete] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Fetch pending results on mount
   useEffect(() => {
@@ -230,11 +231,42 @@ export function ReviewPanel() {
     setIsEditMode(true);
   };
 
+  const handleSubmitToTrailhead = async () => {
+    if (!moduleGroups[moduleGroupIndex]) return;
+    const currentModule = moduleGroups[moduleGroupIndex]!;
+    setIsSubmitting(true);
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? '';
+      const apiToken = process.env.NEXT_PUBLIC_API_TOKEN ?? '';
+      const res = await fetch(`${apiUrl}/api/quiz-results/submit`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiToken}`,
+        },
+        body: JSON.stringify({ module_id: currentModule.module_id }),
+      });
+      if (!res.ok) throw new Error('Submission failed');
+      router.refresh();
+    } catch (err) {
+      console.error('Submit to Trailhead failed:', err);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   // Show "Ready to submit" state when all reviews are approved
   if (isComplete) {
     return (
-      <div className="flex flex-col h-screen border-l bg-card items-center justify-center p-4">
+      <div className="flex flex-col h-screen border-l bg-card items-center justify-center p-4 gap-4">
         <p className="text-sm text-center font-medium">Ready to submit</p>
+        <button
+          onClick={() => { void handleSubmitToTrailhead(); }}
+          disabled={isSubmitting}
+          className="px-4 py-2 text-sm font-medium bg-primary text-primary-foreground rounded-md disabled:opacity-50"
+        >
+          {isSubmitting ? 'Submitting...' : 'Submit to Trailhead'}
+        </button>
       </div>
     );
   }

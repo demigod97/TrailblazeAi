@@ -184,4 +184,127 @@ describe('GET /api/quiz-results', () => {
     const body = JSON.parse(response.body);
     expect(body.error.code).toBe('PIPELINE_ERROR');
   });
+
+  it('returns 200 filtering by ?correct=true for only correct results', async () => {
+    const correctResult = { ...mockQuizResult, is_correct: true };
+    const incorrectResult = { ...mockQuizResult, id: 'result-2', is_correct: false };
+
+    const orderMock = vi.fn().mockResolvedValue({ data: [correctResult, incorrectResult], error: null });
+
+    const { createClient } = await import('@trailblaze/db');
+    vi.mocked(createClient).mockReturnValueOnce({
+      from: vi.fn(() => ({
+        select: vi.fn().mockReturnValue({
+          // Support both paths: .is().order() for pending and .order() for submitted
+          is: vi.fn().mockReturnValue({ order: orderMock }),
+          order: orderMock,
+        }),
+      })),
+    } as unknown as ReturnType<typeof createClient>);
+
+    const app = await buildTestApp();
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/quiz-results?correct=true',
+      headers: { authorization: AUTH_HEADER },
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body);
+    expect(Array.isArray(body.data)).toBe(true);
+    // Only correct results should be included
+    expect(body.data.every((r: Record<string, unknown>) => r.is_correct === true)).toBe(true);
+  });
+
+  it('returns 200 filtering by ?correct=false for only incorrect results', async () => {
+    const correctResult = { ...mockQuizResult, is_correct: true };
+    const incorrectResult = { ...mockQuizResult, id: 'result-2', is_correct: false };
+
+    const orderMock = vi.fn().mockResolvedValue({ data: [correctResult, incorrectResult], error: null });
+
+    const { createClient } = await import('@trailblaze/db');
+    vi.mocked(createClient).mockReturnValueOnce({
+      from: vi.fn(() => ({
+        select: vi.fn().mockReturnValue({
+          // Support both paths: .is().order() for pending and .order() for submitted
+          is: vi.fn().mockReturnValue({ order: orderMock }),
+          order: orderMock,
+        }),
+      })),
+    } as unknown as ReturnType<typeof createClient>);
+
+    const app = await buildTestApp();
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/quiz-results?correct=false',
+      headers: { authorization: AUTH_HEADER },
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body);
+    expect(Array.isArray(body.data)).toBe(true);
+    // Only incorrect results should be included
+    expect(body.data.every((r: Record<string, unknown>) => r.is_correct === false)).toBe(true);
+  });
+});
+
+describe('POST /api/quiz-results/submit', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('returns 200 with { queued: true } when valid module_id provided', async () => {
+    const app = await buildTestApp();
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/quiz-results/submit',
+      headers: { authorization: AUTH_HEADER, 'Content-Type': 'application/json' },
+      payload: { module_id: 'module-1' },
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body);
+    expect(body.data.queued).toBe(true);
+    expect(body.error).toBe(null);
+  });
+
+  it('returns 400 ValidationError when module_id is missing', async () => {
+    const app = await buildTestApp();
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/quiz-results/submit',
+      headers: { authorization: AUTH_HEADER, 'Content-Type': 'application/json' },
+      payload: {},
+    });
+
+    expect(response.statusCode).toBe(400);
+    const body = JSON.parse(response.body);
+    expect(body.error.code).toBe('VALIDATION_ERROR');
+  });
+
+  it('returns 400 ValidationError when module_id is empty string', async () => {
+    const app = await buildTestApp();
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/quiz-results/submit',
+      headers: { authorization: AUTH_HEADER, 'Content-Type': 'application/json' },
+      payload: { module_id: '' },
+    });
+
+    expect(response.statusCode).toBe(400);
+    const body = JSON.parse(response.body);
+    expect(body.error.code).toBe('VALIDATION_ERROR');
+  });
+
+  it('returns 401 without bearer auth', async () => {
+    const app = await buildTestApp();
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/quiz-results/submit',
+      headers: { 'Content-Type': 'application/json' },
+      payload: { module_id: 'module-1' },
+    });
+
+    expect(response.statusCode).toBe(401);
+  });
 });
